@@ -1,92 +1,127 @@
 <script lang="ts">
-import { compile } from "@styx/core";
+  import { compile, format, solve, formatSolveResult } from "@styx/core";
+  import { createPipeline, flatten, simplify, removeEmpty, canonicalize } from "@styx/core";
+  import InputPanel from "./lib/InputPanel.svelte";
+  import OutputPanel from "./lib/OutputPanel.svelte";
+  import PassToggles from "./lib/PassToggles.svelte";
 
-let input = $state<string>("");
+  let input = $state<string>("");
+  let passes = $state({
+    flatten: true,
+    simplify: true,
+    removeEmpty: true,
+    canonicalize: false,
+  });
 
-const result = $derived.by(() => {
-  try {
-    return { ok: true as const, value: compile(input) };
-  } catch (e) {
-    return { ok: false as const, error: e instanceof Error ? e.message : String(e) };
-  }
-});
+  const result = $derived.by(() => {
+    try {
+      const parseResult = compile(input);
+      
+      // Apply selected optimization passes
+      const availablePasses = [];
+      if (passes.flatten) availablePasses.push(flatten);
+      if (passes.simplify) availablePasses.push(simplify);
+      if (passes.removeEmpty) availablePasses.push(removeEmpty);
+      if (passes.canonicalize) availablePasses.push(canonicalize);
+      
+      if (availablePasses.length > 0) {
+        const pipeline = createPipeline(availablePasses, { fixpoint: true });
+        const passResult = pipeline.apply(parseResult.expr);
+        parseResult.expr = passResult.expr;
+        
+        if (passResult.warnings) {
+          parseResult.warnings.push(...passResult.warnings.map(w => ({ message: w })));
+        }
+      }
+
+      return { ok: true as const, value: parseResult };
+    } catch (e) {
+      return { ok: false as const, error: e instanceof Error ? e.message : String(e) };
+    }
+  });
 </script>
 
-<main>
-  <h1>Styx Playground</h1>
+<div class="container">
+  <header>
+    <h1>Styx Compiler Explorer</h1>
+    <PassToggles bind:passes />
+  </header>
+  
   <div class="panels">
     <div class="panel">
-      <h2>Input</h2>
-      <textarea bind:value={input} placeholder="Enter your input here..."></textarea>
+      <InputPanel bind:input />
     </div>
     <div class="panel">
-      <h2>Output</h2>
-      <pre class:error={!result.ok}>{result.ok ? result.value.output : result.error}</pre>
+      <OutputPanel {result} />
     </div>
   </div>
-</main>
+</div>
 
 <style>
-:global(body) {
-  margin: 0;
-  font-family: system-ui, sans-serif;
-  background: #1a1a1a;
-  color: #eee;
-}
+  
+  :global(body) {
+    margin: 0;
+    font-family: system-ui, sans-serif;
+    background: #1a1a1a;
+    color: #eee;
+    overflow: hidden;
+  }
 
-main {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 2rem;
-}
+  :global(*::-webkit-scrollbar) {
+    width: 10px;
+    height: 10px;
+  }
 
-h1 {
-  margin: 0 0 1.5rem;
-}
+  :global(*::-webkit-scrollbar-track) {
+    background: #0d0d0d;
+  }
 
-h2 {
-  margin: 0 0 0.5rem;
-  font-size: 1rem;
-  color: #888;
-}
+  :global(*::-webkit-scrollbar-thumb) {
+    background: #333;
+    border-radius: 5px;
+  }
 
-.panels {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 1rem;
-  height: calc(100vh - 10rem);
-}
+  :global(*::-webkit-scrollbar-thumb:hover) {
+    background: #444;
+  }
 
-.panel {
-  display: flex;
-  flex-direction: column;
-}
+  :global(*) {
+    scrollbar-width: thin;
+    scrollbar-color: #333 #0d0d0d;
+  }
 
-textarea,
-pre {
-  flex: 1;
-  padding: 1rem;
-  border: 1px solid #333;
-  border-radius: 4px;
-  background: #0d0d0d;
-  color: #eee;
-  font-family: "JetBrains Mono", "Fira Code", monospace;
-  font-size: 14px;
-  resize: none;
-}
+  .container {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    max-width: 1600px;
+    margin: 0 auto;
+    padding: 1.5rem;
+    box-sizing: border-box;
+  }
 
-textarea:focus {
-  outline: none;
-  border-color: #666;
-}
+  header {
+    flex-shrink: 0;
+    margin-bottom: 1rem;
+  }
 
-pre {
-  margin: 0;
-  overflow: auto;
-  white-space: pre-wrap;
-}
+  h1 {
+    margin: 0 0 0.75rem;
+    font-size: 1.5rem;
+  }
 
-pre.error {
-  color: #f66;
-}
+  .panels {
+    flex: 1;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    min-height: 0;
+  }
+
+  .panel {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow: hidden;
+  }
 </style>

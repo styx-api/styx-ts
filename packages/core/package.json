@@ -4,17 +4,15 @@
   "type": "module",
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js",
+      "types": "./dist/index.d.mts",
+      "development": "./src/index.ts",
+      "import": "./dist/index.mjs",
       "require": "./dist/index.cjs"
     }
   },
   "main": "./dist/index.cjs",
-  "module": "./dist/index.js",
-  "types": "./dist/index.d.ts",
-  "bin": {
-    "styx": "./dist/cli.js"
-  },
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.mts",
   "files": [
     "dist"
   ],
@@ -24,6 +22,6 @@
   },
   "devDependencies": {
     "@types/node": "^25.0.3",
-    "tsdown": "^0.9.0"
+    "tsdown": "^0.20.1"
   }
 }

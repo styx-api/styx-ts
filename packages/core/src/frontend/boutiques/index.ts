@@ -1,0 +1,1 @@
+export { BoutiquesParser } from "./parser";
