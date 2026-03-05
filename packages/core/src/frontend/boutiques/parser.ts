@@ -415,6 +415,8 @@ export class BoutiquesParser implements Frontend {
       return node;
     }
 
+    const inner = node;
+
     // Order: repeat -> flag -> optional
     // This produces: optional(sequence(flag, repeat(value)))
 
@@ -426,6 +428,16 @@ export class BoutiquesParser implements Frontend {
 
     if (inputType.isOptional) {
       node = this.wrapWithOptional(node);
+    }
+
+    // Hoist metadata (doc, default) to outermost wrapper so backends find it
+    // on the binding node. Keep name on inner for solver's findDeepName.
+    if (node !== inner && inner.meta) {
+      const { name, ...rest } = inner.meta;
+      if (Object.keys(rest).length > 0) {
+        node.meta = { ...node.meta, ...rest };
+        inner.meta = name ? { name } : undefined;
+      }
     }
 
     return node;

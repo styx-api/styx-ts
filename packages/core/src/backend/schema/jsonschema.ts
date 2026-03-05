@@ -43,18 +43,11 @@ class SchemaBuilder {
 
   private fromBinding(binding: Binding): JsonSchema {
     const schema = this.fromType(binding.type, binding.node);
-    const meta = this.findMeta(binding.node);
+    const meta = binding.node.meta;
     if (meta?.doc?.title) schema.title = meta.doc.title;
     if (meta?.doc?.description) schema.description = meta.doc.description;
     if (meta?.defaultValue !== undefined) schema.default = meta.defaultValue;
     return schema;
-  }
-
-  private findMeta(node: Expr): Expr["meta"] {
-    if (node.meta?.doc || node.meta?.defaultValue !== undefined) return node.meta;
-    if (node.kind === "optional") return this.findMeta(node.attrs.node);
-    if (node.kind === "repeat") return this.findMeta(node.attrs.node);
-    return node.meta;
   }
 
   private fromType(type: BoundType, node?: Expr): JsonSchema {
@@ -135,7 +128,7 @@ class SchemaBuilder {
         if (childBinding && childBinding.name in type.fields) {
           properties[childBinding.name] = this.fromBinding(childBinding);
           const fieldType = type.fields[childBinding.name];
-          const meta = this.findMeta(childBinding.node);
+          const meta = childBinding.node.meta;
           if (
             fieldType &&
             fieldType.kind !== "optional" &&
