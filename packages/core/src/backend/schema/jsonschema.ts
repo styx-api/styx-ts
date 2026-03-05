@@ -18,25 +18,24 @@ class SchemaBuilder {
   constructor(private ctx: CodegenContext) {}
 
   build(): JsonSchema {
+    const envelope: JsonSchema = {
+      $schema: "https://json-schema.org/draft/2020-12/schema",
+    };
+    if (this.ctx.app?.doc?.title) envelope.title = this.ctx.app.doc.title;
+    if (this.ctx.app?.doc?.description) envelope.description = this.ctx.app.doc.description;
+
     const rootBinding = this.ctx.resolve(this.ctx.expr);
-    if (!rootBinding) {
-      const schema: JsonSchema = { $schema: "https://json-schema.org/draft/2020-12/schema" };
-      if (this.ctx.app?.doc?.title) schema.title = this.ctx.app.doc.title;
-      if (this.ctx.app?.doc?.description) schema.description = this.ctx.app.doc.description;
-      return schema;
-    }
+    if (!rootBinding) return envelope;
 
-    const schema = this.fromBinding(rootBinding);
-    schema.$schema = "https://json-schema.org/draft/2020-12/schema";
-    if (this.ctx.app?.doc?.title) schema.title = this.ctx.app.doc.title;
-    if (this.ctx.app?.doc?.description) schema.description = this.ctx.app.doc.description;
-
-    return schema;
+    return { ...envelope, ...this.fromBinding(rootBinding) };
   }
 
   private fromBinding(binding: Binding): JsonSchema {
     const schema = this.fromType(binding.type, binding.node);
-    this.enrichWithMeta(schema, binding.node);
+    const meta = this.findMeta(binding.node);
+    if (meta?.doc?.title) schema.title = meta.doc.title;
+    if (meta?.doc?.description) schema.description = meta.doc.description;
+    if (meta?.defaultValue !== undefined) schema.default = meta.defaultValue;
     return schema;
   }
 
@@ -49,13 +48,6 @@ class SchemaBuilder {
       if (nonLiteral) return this.findMeta(nonLiteral);
     }
     return node.meta;
-  }
-
-  private enrichWithMeta(schema: JsonSchema, node: Expr): void {
-    const meta = this.findMeta(node);
-    if (meta?.doc?.title) schema.title = meta.doc.title;
-    if (meta?.doc?.description) schema.description = meta.doc.description;
-    if (meta?.defaultValue !== undefined) schema.default = meta.defaultValue;
   }
 
   private fromType(type: BoundType, node?: Expr): JsonSchema {
