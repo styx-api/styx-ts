@@ -21,7 +21,7 @@ function findDeepName(node: Expr): string | undefined {
 
   if (node.kind === "sequence") {
     return node.attrs.nodes
-      .filter(n => n.kind !== "literal")
+      .filter((n) => n.kind !== "literal")
       .map(findDeepName)
       .find(Boolean);
   }
@@ -33,22 +33,24 @@ export function defaultNamingStrategy(): NamingStrategy {
   let counter = 0;
 
   return {
-    getName: (node, path) =>
-      findDeepName(node) ?? path[path.length - 1] ?? `param_${counter++}`,
+    getName: (node, path) => findDeepName(node) ?? path[path.length - 1] ?? `param_${counter++}`,
     generateId: () => `binding_${counter++}`,
   };
 }
 
 // Helper to check if alternative should collapse to bool
 function isBooleanLiteralPair(variants: Array<{ type: BoundType }>): boolean {
-  if (variants.length !== 2 || !variants.every(v => v.type.kind === "literal")) {
+  if (variants.length !== 2 || !variants.every((v) => v.type.kind === "literal")) {
     return false;
   }
-  const [a, b] = variants.map(v => v.type.kind === "literal" ? v.type.value : null);
+  const [a, b] = variants.map((v) => (v.type.kind === "literal" ? v.type.value : null));
   return (
-    (a === 0 && b === 1) || (a === 1 && b === 0) ||
-    (a === "0" && b === "1") || (a === "1" && b === "0") ||
-    (a === "false" && b === "true") || (a === "true" && b === "false")
+    (a === 0 && b === 1) ||
+    (a === 1 && b === 0) ||
+    (a === "0" && b === "1") ||
+    (a === "1" && b === "0") ||
+    (a === "false" && b === "true") ||
+    (a === "true" && b === "false")
   );
 }
 
@@ -72,7 +74,7 @@ function tagVariant(variant: { name: string; type: BoundType; node: Expr }): voi
     const fieldName = findDeepName(variant.node) || "value";
     variant.type = {
       kind: "struct",
-      fields: { "@type": tag, [fieldName]: variant.type }
+      fields: { "@type": tag, [fieldName]: variant.type },
     };
   }
 }
@@ -142,8 +144,9 @@ export function solve(expr: Expr, options?: SolveOptions): SolveResult {
             (alt.kind === "literal" ? literalFromNode(alt) : { kind: "bool" as const });
 
           const name =
-            alt.kind === "literal" ? alt.attrs.str.replace(/^-+/, '') :
-              alt.meta?.name ?? `variant_${i}`;
+            alt.kind === "literal"
+              ? alt.attrs.str.replace(/^-+/, "")
+              : (alt.meta?.name ?? `variant_${i}`);
 
           return { name, type: childType, node: alt };
         });
@@ -156,7 +159,7 @@ export function solve(expr: Expr, options?: SolveOptions): SolveResult {
         }
 
         // Pattern: all literals -> literal union
-        const allLiterals = variants.every(v => v.type.kind === "literal");
+        const allLiterals = variants.every((v) => v.type.kind === "literal");
         if (!allLiterals) {
           // Complex union -> inject discriminators
           variants.forEach(tagVariant);
@@ -164,7 +167,7 @@ export function solve(expr: Expr, options?: SolveOptions): SolveResult {
 
         const type: BoundType = {
           kind: "union",
-          variants: variants.map(({ name, type }) => ({ name, type }))
+          variants: variants.map(({ name, type }) => ({ name, type })),
         };
         createBinding(node, name, type);
         return type;

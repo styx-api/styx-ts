@@ -1,10 +1,10 @@
 <!-- components/InputPanel.svelte -->
 <script lang="ts">
-  import { onMount } from 'svelte';
-  import { EditorView, minimalSetup } from 'codemirror';
-  import { EditorState } from '@codemirror/state';
-  import { json } from '@codemirror/lang-json';
-  import { oneDark } from '@codemirror/theme-one-dark';
+  import { onMount } from "svelte";
+  import { EditorView, minimalSetup } from "codemirror";
+  import { EditorState } from "@codemirror/state";
+  import { json } from "@codemirror/lang-json";
+  import { oneDark } from "@codemirror/theme-one-dark";
 
   interface Props {
     input: string;
@@ -47,7 +47,7 @@
       input = JSON.stringify(jsonData, null, 2);
       if (editorView) {
         editorView.dispatch({
-          changes: { from: 0, to: editorView.state.doc.length, insert: input }
+          changes: { from: 0, to: editorView.state.doc.length, insert: input },
         });
       }
     } catch (e) {
@@ -86,7 +86,7 @@
   $effect(() => {
     if (editorView && editorView.state.doc.toString() !== input) {
       editorView.dispatch({
-        changes: { from: 0, to: editorView.state.doc.length, insert: input }
+        changes: { from: 0, to: editorView.state.doc.length, insert: input },
       });
     }
   });

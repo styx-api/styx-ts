@@ -4,4 +4,4 @@ export type { Pass } from "./pass.js";
 export { compose, fixpoint } from "./pass.js";
 export { createPipeline, defaultPipeline } from "./pipeline.js";
 export { simplify } from "./simplify.js";
-export { removeEmpty } from "./remove-empty.js"
+export { removeEmpty } from "./remove-empty.js";

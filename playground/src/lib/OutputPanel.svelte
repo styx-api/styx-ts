@@ -11,7 +11,7 @@
 
   let { result }: Props = $props();
   let irSize = $state(50);
-  
+
   function setFocus(section: "ir" | "bindings") {
     if (section === "ir") {
       irSize = irSize === 75 ? 50 : 75;
@@ -24,7 +24,7 @@
 <div class="output">
   {#if result.ok}
     {@const { expr, errors, warnings } = result.value}
-    
+
     {#if errors.length > 0}
       <Messages type="errors" messages={errors} />
     {/if}
@@ -37,8 +37,8 @@
       <section class="ast">
         <div class="header">
           <h2>IR</h2>
-          <button 
-            class="focus-btn" 
+          <button
+            class="focus-btn"
             onclick={() => setFocus("ir")}
             title={irSize === 75 ? "Reset" : "Expand IR"}
           >
@@ -51,8 +51,8 @@
       <section class="ast">
         <div class="header">
           <h2>Bindings</h2>
-          <button 
-            class="focus-btn" 
+          <button
+            class="focus-btn"
             onclick={() => setFocus("bindings")}
             title={irSize === 25 ? "Reset" : "Expand Bindings"}
           >

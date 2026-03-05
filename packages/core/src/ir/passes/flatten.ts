@@ -16,7 +16,7 @@ export const flatten: Pass = {
         case "sequence": {
           const children = node.attrs.nodes.map(visit);
           const nodes: Expr[] = [];
-          
+
           for (const child of children) {
             if (child.kind === "sequence" && child.attrs.join === node.attrs.join && !child.meta) {
               changed = true;
@@ -25,14 +25,14 @@ export const flatten: Pass = {
               nodes.push(child);
             }
           }
-          
+
           return { ...node, attrs: { ...node.attrs, nodes } };
         }
-        
+
         case "alternative": {
           const children = node.attrs.alts.map(visit);
           const alts: Expr[] = [];
-          
+
           for (const child of children) {
             if (child.kind === "alternative" && !child.meta) {
               changed = true;
@@ -41,23 +41,23 @@ export const flatten: Pass = {
               alts.push(child);
             }
           }
-          
+
           return { ...node, attrs: { ...node.attrs, alts } };
         }
-        
+
         case "optional":
           return { ...node, attrs: { node: visit(node.attrs.node) } };
-        
+
         case "repeat":
           return { ...node, attrs: { ...node.attrs, node: visit(node.attrs.node) } };
-        
+
         case "literal":
         case "int":
         case "float":
         case "str":
         case "path":
           return node;
-        
+
         default: {
           const _exhaustive: never = node;
           return node;

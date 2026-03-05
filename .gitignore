@@ -3,3 +3,5 @@ dist
 .svelte-kit
 *.log
 .DS_Store
+.claude/
+CLAUDE.md

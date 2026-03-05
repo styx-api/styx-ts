@@ -10,7 +10,7 @@ export function formatSolveResult(result: SolveResult, expr: Expr): string {
 function formatType(type: BoundType, indent = 0): string {
   const pad = "  ".repeat(indent);
   const inner = (t: BoundType) => formatType(t, indent + 1);
-  
+
   switch (type.kind) {
     case "scalar":
       return type.scalar;
@@ -24,7 +24,7 @@ function formatType(type: BoundType, indent = 0): string {
       return `optional<${inner(type.inner)}>`;
     case "list":
       return `list<${inner(type.item)}>`;
-    
+
     case "struct": {
       const entries = Object.entries(type.fields);
       if (entries.length === 0) return "struct {}";
@@ -35,25 +35,29 @@ function formatType(type: BoundType, indent = 0): string {
       const fields = entries.map(([name, t]) => `${pad}  ${name}: ${inner(t)}`).join("\n");
       return `struct {\n${fields}\n${pad}}`;
     }
-    
+
     case "union": {
       if (type.variants.length === 0) return "union {}";
-      
+
       // If all variants are literals, display inline
-      const allLiterals = type.variants.every(v => v.type.kind === "literal");
+      const allLiterals = type.variants.every((v) => v.type.kind === "literal");
       if (allLiterals) {
         return type.variants
-          .map(v => v.type.kind === "literal"
-            ? (typeof v.type.value === "number" ? String(v.type.value) : `"${v.type.value}"`)
-            : "?")
+          .map((v) =>
+            v.type.kind === "literal"
+              ? typeof v.type.value === "number"
+                ? String(v.type.value)
+                : `"${v.type.value}"`
+              : "?",
+          )
           .join(" | ");
       }
-      
+
       // Otherwise multi-line union
-      const variants = type.variants.map(v => `${pad}  | ${v.name}: ${inner(v.type)}`).join("\n");
+      const variants = type.variants.map((v) => `${pad}  | ${v.name}: ${inner(v.type)}`).join("\n");
       return `union {\n${variants}\n${pad}}`;
     }
-    
+
     default:
       return ((x: never) => "unknown")(type);
   }

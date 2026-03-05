@@ -47,10 +47,10 @@ export const canonicalize: Pass = {
       switch (node.kind) {
         case "alternative": {
           const children = node.attrs.alts.map(visit);
-          
+
           // Sort alternatives
           const sorted = [...children].sort((a, b) => sortKey(a).localeCompare(sortKey(b)));
-          
+
           // Deduplicate by structural hash
           const seen = new Set<string>();
           const alts: Expr[] = [];
@@ -63,34 +63,36 @@ export const canonicalize: Pass = {
               changed = true;
             }
           }
-          
+
           // Check if order changed
-          if (alts.length !== children.length || 
-              alts.some((alt, i) => structuralHash(alt) !== structuralHash(children[i]!))) {
+          if (
+            alts.length !== children.length ||
+            alts.some((alt, i) => structuralHash(alt) !== structuralHash(children[i]!))
+          ) {
             changed = true;
           }
-          
+
           return { ...node, attrs: { ...node.attrs, alts } };
         }
-        
+
         case "sequence": {
           const nodes = node.attrs.nodes.map(visit);
           return { ...node, attrs: { ...node.attrs, nodes } };
         }
-        
+
         case "optional":
           return { ...node, attrs: { node: visit(node.attrs.node) } };
-        
+
         case "repeat":
           return { ...node, attrs: { ...node.attrs, node: visit(node.attrs.node) } };
-        
+
         case "literal":
         case "int":
         case "float":
         case "str":
         case "path":
           return node;
-        
+
         default: {
           const _exhaustive: never = node;
           return node;

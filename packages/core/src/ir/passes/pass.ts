@@ -24,11 +24,11 @@ export function compose(...passes: Pass[]): Pass {
       let current = expr;
       let overallStatus = PassStatus.Unchanged;
       const warnings: string[] = [];
-      
+
       for (const pass of passes) {
         const result = pass.apply(current);
         current = result.expr;
-        
+
         if (result.status !== PassStatus.Unchanged) {
           overallStatus = result.status;
         }
@@ -36,9 +36,9 @@ export function compose(...passes: Pass[]): Pass {
           warnings.push(...result.warnings);
         }
       }
-      
-      return { 
-        expr: current, 
+
+      return {
+        expr: current,
         status: overallStatus,
         ...(warnings.length > 0 && { warnings }),
       };
@@ -52,26 +52,27 @@ export function fixpoint(pass: Pass, maxIterations = 10): Pass {
     apply(expr: Expr): PassResult {
       let current = expr;
       const allWarnings: string[] = [];
-      
+
       for (let i = 0; i < maxIterations; ++i) {
         const result = pass.apply(current);
-        
+
         if (result.warnings) {
           allWarnings.push(...result.warnings);
         }
-        
+
         // Stop if unchanged or no rerun needed
         if (result.status !== PassStatus.ChangedNeedsRerun) {
-          return { 
-            expr: result.expr, 
-            status: result.status === PassStatus.Unchanged ? PassStatus.Unchanged : PassStatus.Changed,
+          return {
+            expr: result.expr,
+            status:
+              result.status === PassStatus.Unchanged ? PassStatus.Unchanged : PassStatus.Changed,
             ...(allWarnings.length > 0 && { warnings: allWarnings }),
           };
         }
-        
+
         current = result.expr;
       }
-      
+
       // Hit max iterations
       return {
         expr: current,

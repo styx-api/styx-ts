@@ -331,40 +331,40 @@ export class BoutiquesParser implements Frontend {
       }
 
       case InputTypePrimitive.SubCommandUnion: {
-  const alts = btInput.type;
-  if (!isArray(alts)) {
-    this.error(`Invalid subcommand union type for '${btInput.id}'`);
-    return null;
-  }
-  const parsedAlts: Expr[] = [];
-  for (const alt of alts) {
-    if (!isObject(alt)) {
-      this.warn("Skipping non-object subcommand alternative");
-      continue;
-    }
-    const parsed = this.parseDescriptor(alt);
-    if (parsed) {
-      // Set metadata from the subcommand descriptor
-      const altMeta = this.buildAppMeta(alt);
-      if (altMeta?.id) {
-        parsed.meta = { ...parsed.meta, name: altMeta.id };
+        const alts = btInput.type;
+        if (!isArray(alts)) {
+          this.error(`Invalid subcommand union type for '${btInput.id}'`);
+          return null;
+        }
+        const parsedAlts: Expr[] = [];
+        for (const alt of alts) {
+          if (!isObject(alt)) {
+            this.warn("Skipping non-object subcommand alternative");
+            continue;
+          }
+          const parsed = this.parseDescriptor(alt);
+          if (parsed) {
+            // Set metadata from the subcommand descriptor
+            const altMeta = this.buildAppMeta(alt);
+            if (altMeta?.id) {
+              parsed.meta = { ...parsed.meta, name: altMeta.id };
+            }
+            parsedAlts.push(parsed);
+          }
+        }
+        if (parsedAlts.length === 0) {
+          this.error(`No valid alternatives for subcommand union '${btInput.id}'`);
+          return null;
+        }
+        if (parsedAlts.length === 1) {
+          const node = parsedAlts[0]!;
+          if (meta) node.meta = { ...node.meta, ...meta };
+          return node;
+        }
+        const node: Alternative = { kind: "alternative", attrs: { alts: parsedAlts } };
+        if (meta) node.meta = meta;
+        return node;
       }
-      parsedAlts.push(parsed);
-    }
-  }
-  if (parsedAlts.length === 0) {
-    this.error(`No valid alternatives for subcommand union '${btInput.id}'`);
-    return null;
-  }
-  if (parsedAlts.length === 1) {
-    const node = parsedAlts[0]!;
-    if (meta) node.meta = { ...node.meta, ...meta };
-    return node;
-  }
-  const node: Alternative = { kind: "alternative", attrs: { alts: parsedAlts } };
-  if (meta) node.meta = meta;
-  return node;
-}
 
       default:
         return null;

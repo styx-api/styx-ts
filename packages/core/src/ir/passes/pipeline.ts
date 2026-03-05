@@ -5,7 +5,9 @@ import { compose, fixpoint } from "./pass.js";
 import { removeEmpty } from "./remove-empty.js";
 import { simplify } from "./simplify.js";
 
-export const defaultPipeline: Pass = fixpoint(compose(flatten, removeEmpty, simplify, /* canonicalize */));
+export const defaultPipeline: Pass = fixpoint(
+  compose(flatten, removeEmpty, simplify /* canonicalize */),
+);
 
 export function createPipeline(
   passes: Pass[],

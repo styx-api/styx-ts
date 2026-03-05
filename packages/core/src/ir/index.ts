@@ -27,5 +27,3 @@ export {
   removeEmpty,
 } from "./passes/index.js";
 export type { Documentation, MediaTypeIdentifier, ScalarKind } from "./types.js";
-export type { Transformer, Visitor } from "./_walker.js";
-export { collectTerminals, transform, walk } from "./_walker.js";

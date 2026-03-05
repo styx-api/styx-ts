@@ -6,23 +6,27 @@ function mergeMeta(parent?: NodeMeta, child?: NodeMeta): NodeMeta | undefined {
   if (!parent && !child) return undefined;
   if (!parent) return child;
   if (!child) return parent;
-  
+
   // Merge with child (innermost) name taking precedence
   return {
     name: child.name ?? parent.name,
-    ...(parent.doc || child.doc ? {
-      doc: {
-        title: child.doc?.title ?? parent.doc?.title,
-        description: child.doc?.description ?? parent.doc?.description,
-        authors: [...(parent.doc?.authors ?? []), ...(child.doc?.authors ?? [])],
-        literature: [...(parent.doc?.literature ?? []), ...(child.doc?.literature ?? [])],
-        urls: [...(parent.doc?.urls ?? []), ...(child.doc?.urls ?? [])],
-        comment: child.doc?.comment ?? parent.doc?.comment,
-      }
-    } : {}),
-    ...(parent.outputs || child.outputs ? {
-      outputs: [...(parent.outputs ?? []), ...(child.outputs ?? [])]
-    } : {}),
+    ...(parent.doc || child.doc
+      ? {
+          doc: {
+            title: child.doc?.title ?? parent.doc?.title,
+            description: child.doc?.description ?? parent.doc?.description,
+            authors: [...(parent.doc?.authors ?? []), ...(child.doc?.authors ?? [])],
+            literature: [...(parent.doc?.literature ?? []), ...(child.doc?.literature ?? [])],
+            urls: [...(parent.doc?.urls ?? []), ...(child.doc?.urls ?? [])],
+            comment: child.doc?.comment ?? parent.doc?.comment,
+          },
+        }
+      : {}),
+    ...(parent.outputs || child.outputs
+      ? {
+          outputs: [...(parent.outputs ?? []), ...(child.outputs ?? [])],
+        }
+      : {}),
   };
 }
 

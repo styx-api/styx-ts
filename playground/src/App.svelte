@@ -16,21 +16,21 @@
   const result = $derived.by(() => {
     try {
       const parseResult = compile(input);
-      
+
       // Apply selected optimization passes
       const availablePasses = [];
       if (passes.flatten) availablePasses.push(flatten);
       if (passes.simplify) availablePasses.push(simplify);
       if (passes.removeEmpty) availablePasses.push(removeEmpty);
       if (passes.canonicalize) availablePasses.push(canonicalize);
-      
+
       if (availablePasses.length > 0) {
         const pipeline = createPipeline(availablePasses, { fixpoint: true });
         const passResult = pipeline.apply(parseResult.expr);
         parseResult.expr = passResult.expr;
-        
+
         if (passResult.warnings) {
-          parseResult.warnings.push(...passResult.warnings.map(w => ({ message: w })));
+          parseResult.warnings.push(...passResult.warnings.map((w) => ({ message: w })));
         }
       }
 
@@ -46,7 +46,7 @@
     <h1>Styx Compiler Explorer</h1>
     <PassToggles bind:passes />
   </header>
-  
+
   <div class="panels">
     <div class="panel">
       <InputPanel bind:input />
@@ -58,7 +58,6 @@
 </div>
 
 <style>
-  
   :global(body) {
     margin: 0;
     font-family: system-ui, sans-serif;
