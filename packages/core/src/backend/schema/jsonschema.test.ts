@@ -274,6 +274,8 @@ describe("JsonSchemaBackend", () => {
     expect(schema.description).toBe("Automated brain extraction tool for FSL");
 
     const props = schema.properties as Record<string, JsonSchema>;
+    expect(props["@type"]).toEqual({ const: "unknown/bet" });
+    expect(schema.required).toContain("@type");
     expect(props["infile"]?.type).toBe("string");
     expect(props["infile"]?.format).toBe("path");
     expect(props["maskfile"]?.type).toBe("string");

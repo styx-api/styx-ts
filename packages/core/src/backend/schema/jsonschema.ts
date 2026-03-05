@@ -27,7 +27,18 @@ class SchemaBuilder {
     const rootBinding = this.ctx.resolve(this.ctx.expr);
     if (!rootBinding) return envelope;
 
-    return { ...envelope, ...this.fromBinding(rootBinding) };
+    const schema = { ...envelope, ...this.fromBinding(rootBinding) };
+
+    if (this.ctx.app?.id && schema.properties) {
+      const pkg = this.ctx.package?.name ?? "unknown";
+      schema.properties = {
+        "@type": { const: `${pkg}/${this.ctx.app.id}` },
+        ...schema.properties,
+      };
+      schema.required = ["@type", ...(schema.required ?? [])];
+    }
+
+    return schema;
   }
 
   private fromBinding(binding: Binding): JsonSchema {
