@@ -285,7 +285,8 @@ describe("JsonSchemaBackend", () => {
     expect(schema.required).toContain("infile");
     expect(schema.required).toContain("maskfile");
     expect(schema.required).not.toContain("fractional_intensity");
-    // verbose is bool (not optional<bool>), so it is required
-    expect(schema.required).toContain("verbose");
+    // verbose is bool with default false, so it is not required
+    expect(schema.required).not.toContain("verbose");
+    expect(props["verbose"]?.default).toBe(false);
   });
 });

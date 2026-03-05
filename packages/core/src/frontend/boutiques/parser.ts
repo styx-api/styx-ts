@@ -320,7 +320,9 @@ export class BoutiquesParser implements Frontend {
         }
         const literal: Literal = { kind: "literal", attrs: { str: flag } };
         const node: Optional = { kind: "optional", attrs: { node: literal } };
-        if (meta) node.meta = meta;
+        const flagMeta = meta ?? {};
+        if (flagMeta.defaultValue === undefined) flagMeta.defaultValue = false;
+        node.meta = flagMeta;
         return node;
       }
 

@@ -135,7 +135,13 @@ class SchemaBuilder {
         if (childBinding && childBinding.name in type.fields) {
           properties[childBinding.name] = this.fromBinding(childBinding);
           const fieldType = type.fields[childBinding.name];
-          if (fieldType && fieldType.kind !== "optional" && fieldType.kind !== "nullable") {
+          const meta = this.findMeta(childBinding.node);
+          if (
+            fieldType &&
+            fieldType.kind !== "optional" &&
+            fieldType.kind !== "nullable" &&
+            meta?.defaultValue === undefined
+          ) {
             required.push(childBinding.name);
           }
         }
