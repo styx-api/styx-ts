@@ -54,10 +54,6 @@ class SchemaBuilder {
     if (node.meta?.doc || node.meta?.defaultValue !== undefined) return node.meta;
     if (node.kind === "optional") return this.findMeta(node.attrs.node);
     if (node.kind === "repeat") return this.findMeta(node.attrs.node);
-    if (node.kind === "sequence") {
-      const nonLiteral = node.attrs.nodes.find((n) => n.kind !== "literal");
-      if (nonLiteral) return this.findMeta(nonLiteral);
-    }
     return node.meta;
   }
 
