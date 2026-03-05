@@ -5,7 +5,7 @@ export function format(expr: Expr, meta?: AppMeta): string {
   const lines: string[] = [];
 
   if (meta) {
-    lines.push(`app ${meta.id}${meta.version ? `@${meta.version}` : ""}`);
+    lines.push(`app ${meta.id ?? "unknown"}${meta.version ? `@${meta.version}` : ""}`);
     if (meta.doc?.description) {
       lines.push(`  "${meta.doc.description}"`);
     }

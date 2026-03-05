@@ -1,6 +1,6 @@
 import type { BindingRegistry, SolveResult } from "../bindings/index.js";
-import type { Expr } from "../ir/index.js";
-import type { AppMeta, PackageMeta, ProjectMeta } from "./types.js";
+import type { AppMeta, Expr } from "../ir/index.js";
+import type { PackageMeta, ProjectMeta } from "./types.js";
 
 export interface CodegenContext {
   expr: Expr;

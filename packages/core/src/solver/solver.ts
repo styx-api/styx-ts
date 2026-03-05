@@ -184,6 +184,24 @@ export function solve(expr: Expr, options?: SolveOptions): SolveResult {
     }
   }
 
-  solveNode(expr, []);
+  const rootType = solveNode(expr, []);
+
+  // Ensure a root binding always exists, even when the sequence collapsed
+  // (0 fields -> empty struct, 1 field -> single-field struct)
+  if (!nodeToBinding.has(expr) && expr.kind === "sequence") {
+    const name = strategy.getName(expr, []);
+    if (rootType === null) {
+      createBinding(expr, name, { kind: "struct", fields: {} });
+    } else {
+      // Single field was collapsed - wrap it back into a struct
+      const childName = expr.attrs.nodes
+        .map((child) => nodeToBinding.get(child))
+        .find(Boolean)?.name;
+      if (childName) {
+        createBinding(expr, name, { kind: "struct", fields: { [childName]: rootType } });
+      }
+    }
+  }
+
   return { bindings: registry, resolve: (node) => nodeToBinding.get(node) };
 }

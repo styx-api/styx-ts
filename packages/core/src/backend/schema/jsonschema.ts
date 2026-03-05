@@ -1,4 +1,7 @@
-import type { BindingRegistry, BoundType } from "../../bindings/index.js";
+import type { Binding, BoundType, BoundVariant } from "../../bindings/index.js";
+import type { Expr, ScalarKind } from "../../ir/index.js";
+import type { CodegenContext } from "../../manifest/index.js";
+import type { Backend, EmitResult } from "../backend.js";
 
 export interface JsonSchema {
   type?: string;
@@ -6,54 +9,179 @@ export interface JsonSchema {
   properties?: Record<string, JsonSchema>;
   required?: string[];
   oneOf?: JsonSchema[];
+  enum?: (string | number)[];
+  const?: string | number;
   [key: string]: unknown;
 }
 
-export function toJsonSchema(type: BoundType): JsonSchema {
-  switch (type.kind) {
-    case "scalar":
-      return {
-        int: { type: "integer" },
-        float: { type: "number" },
-        str: { type: "string" },
-        path: { type: "string", format: "path" },
-      }[type.scalar];
-    case "bool":
-      return { type: "boolean" };
-    case "count":
-      return { type: "integer", minimum: 0 };
-    case "optional":
-      return toJsonSchema(type.inner);
-    case "list":
-      return { type: "array", items: toJsonSchema(type.item) };
-    case "struct": {
-      const properties: Record<string, JsonSchema> = {};
-      const required: string[] = [];
-      for (const [name, fieldType] of Object.entries(type.fields)) {
-        properties[name] = toJsonSchema(fieldType);
-        if (fieldType.kind !== "optional" && fieldType.kind !== "nullable") required.push(name);
-      }
-      return { type: "object", properties, required };
+class SchemaBuilder {
+  constructor(private ctx: CodegenContext) {}
+
+  build(): JsonSchema {
+    const rootBinding = this.ctx.resolve(this.ctx.expr);
+    if (!rootBinding) {
+      const schema: JsonSchema = { $schema: "https://json-schema.org/draft/2020-12/schema" };
+      if (this.ctx.app?.doc?.title) schema.title = this.ctx.app.doc.title;
+      if (this.ctx.app?.doc?.description) schema.description = this.ctx.app.doc.description;
+      return schema;
     }
-    case "union":
-      return { oneOf: type.variants.map((v) => toJsonSchema(v.type)) };
-    case "nullable":
-      return { oneOf: [toJsonSchema(type.inner), { type: "null" }] };
+
+    const schema = this.fromBinding(rootBinding);
+    schema.$schema = "https://json-schema.org/draft/2020-12/schema";
+    if (this.ctx.app?.doc?.title) schema.title = this.ctx.app.doc.title;
+    if (this.ctx.app?.doc?.description) schema.description = this.ctx.app.doc.description;
+
+    return schema;
+  }
+
+  private fromBinding(binding: Binding): JsonSchema {
+    const schema = this.fromType(binding.type, binding.node);
+    this.enrichWithMeta(schema, binding.node);
+    return schema;
+  }
+
+  private findMeta(node: Expr): Expr["meta"] {
+    if (node.meta?.doc || node.meta?.defaultValue !== undefined) return node.meta;
+    if (node.kind === "optional") return this.findMeta(node.attrs.node);
+    if (node.kind === "repeat") return this.findMeta(node.attrs.node);
+    if (node.kind === "sequence") {
+      const nonLiteral = node.attrs.nodes.find((n) => n.kind !== "literal");
+      if (nonLiteral) return this.findMeta(nonLiteral);
+    }
+    return node.meta;
+  }
+
+  private enrichWithMeta(schema: JsonSchema, node: Expr): void {
+    const meta = this.findMeta(node);
+    if (meta?.doc?.title) schema.title = meta.doc.title;
+    if (meta?.doc?.description) schema.description = meta.doc.description;
+    if (meta?.defaultValue !== undefined) schema.default = meta.defaultValue;
+  }
+
+  private fromType(type: BoundType, node?: Expr): JsonSchema {
+    switch (type.kind) {
+      case "scalar":
+        return this.scalarSchema(type.scalar, node);
+      case "bool":
+        return { type: "boolean" };
+      case "count":
+        return { type: "integer", minimum: 0 };
+      case "literal":
+        return { const: type.value };
+      case "optional":
+        return this.fromType(
+          type.inner,
+          node?.kind === "optional" ? node.attrs.node : undefined,
+        );
+      case "list":
+        return {
+          type: "array",
+          items: this.fromType(
+            type.item,
+            node?.kind === "repeat" ? node.attrs.node : undefined,
+          ),
+        };
+      case "struct":
+        return this.structSchema(type, node);
+      case "union":
+        return this.unionSchema(type);
+      case "nullable":
+        return { oneOf: [this.fromType(type.inner, node), { type: "null" }] };
+    }
+  }
+
+  private findTerminal(node: Expr): Expr {
+    switch (node.kind) {
+      case "optional":
+        return this.findTerminal(node.attrs.node);
+      case "repeat":
+        return this.findTerminal(node.attrs.node);
+      case "sequence": {
+        const nonLiteral = node.attrs.nodes.find((n) => n.kind !== "literal");
+        return nonLiteral ? this.findTerminal(nonLiteral) : node;
+      }
+      default:
+        return node;
+    }
+  }
+
+  private scalarSchema(scalar: ScalarKind, node?: Expr): JsonSchema {
+    const base: JsonSchema = {
+      int: { type: "integer" } as JsonSchema,
+      float: { type: "number" } as JsonSchema,
+      str: { type: "string" } as JsonSchema,
+      path: { type: "string", format: "path" } as JsonSchema,
+    }[scalar];
+
+    const terminal = node ? this.findTerminal(node) : undefined;
+    if (terminal && (terminal.kind === "int" || terminal.kind === "float")) {
+      if (terminal.attrs.minValue !== undefined) base.minimum = terminal.attrs.minValue;
+      if (terminal.attrs.maxValue !== undefined) base.maximum = terminal.attrs.maxValue;
+    }
+
+    return base;
+  }
+
+  private structSchema(
+    type: Extract<BoundType, { kind: "struct" }>,
+    node?: Expr,
+  ): JsonSchema {
+    const properties: Record<string, JsonSchema> = {};
+    const required: string[] = [];
+
+    if (node?.kind === "sequence") {
+      for (const child of node.attrs.nodes) {
+        const childBinding = this.ctx.resolve(child);
+        if (childBinding && childBinding.name in type.fields) {
+          properties[childBinding.name] = this.fromBinding(childBinding);
+          const fieldType = type.fields[childBinding.name];
+          if (fieldType && fieldType.kind !== "optional" && fieldType.kind !== "nullable") {
+            required.push(childBinding.name);
+          }
+        }
+      }
+    } else {
+      for (const [name, fieldType] of Object.entries(type.fields)) {
+        properties[name] = this.fromType(fieldType);
+        if (fieldType.kind !== "optional" && fieldType.kind !== "nullable") {
+          required.push(name);
+        }
+      }
+    }
+
+    const schema: JsonSchema = { type: "object", properties };
+    if (required.length > 0) schema.required = required;
+    return schema;
+  }
+
+  private unionSchema(type: Extract<BoundType, { kind: "union" }>): JsonSchema {
+    const allLiterals = type.variants.every((v: BoundVariant) => v.type.kind === "literal");
+    if (allLiterals) {
+      return {
+        enum: type.variants.map((v: BoundVariant) =>
+          v.type.kind === "literal" ? v.type.value : "",
+        ),
+      };
+    }
+    return { oneOf: type.variants.map((v: BoundVariant) => this.fromType(v.type)) };
   }
 }
 
-export function generateSchema(bindings: BindingRegistry): JsonSchema {
-  const properties: Record<string, JsonSchema> = {};
-  const required: string[] = [];
-  for (const binding of bindings.values()) {
-    properties[binding.name] = toJsonSchema(binding.type);
-    if (binding.type.kind !== "optional" && binding.type.kind !== "nullable")
-      required.push(binding.name);
+export function generateSchema(ctx: CodegenContext): JsonSchema {
+  return new SchemaBuilder(ctx).build();
+}
+
+export class JsonSchemaBackend implements Backend {
+  readonly name = "json-schema";
+  readonly target = "json-schema";
+
+  emit(ctx: CodegenContext): EmitResult {
+    const schema = generateSchema(ctx);
+    const json = JSON.stringify(schema, null, 2);
+    return {
+      files: new Map([["schema.json", json]]),
+      errors: [],
+      warnings: [],
+    };
   }
-  return {
-    $schema: "https://json-schema.org/draft/2020-12/schema",
-    type: "object",
-    properties,
-    required,
-  };
 }

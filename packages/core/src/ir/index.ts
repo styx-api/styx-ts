@@ -1,5 +1,5 @@
 export { format } from "./format.js";
-export type { NodeMeta, Output, OutputToken } from "./meta.js";
+export type { AppMeta, NodeMeta, Output, OutputToken, StreamOutput } from "./meta.js";
 export type {
   Alternative,
   Expr,

@@ -1,6 +1,12 @@
 <!-- components/OutputPanel.svelte -->
 <script lang="ts">
-  import { format, solve, formatSolveResult } from "@styx/core";
+  import {
+    format,
+    solve,
+    formatSolveResult,
+    JsonSchemaBackend,
+    createContext,
+  } from "@styx/core";
   import type { ParseResult } from "@styx/core";
   import Messages from "./Messages.svelte";
   import CodeBlock from "./CodeBlock.svelte";
@@ -10,14 +16,17 @@
   }
 
   let { result }: Props = $props();
-  let irSize = $state(50);
+  let activeTab = $state<"ir" | "bindings" | "schema">("ir");
 
-  function setFocus(section: "ir" | "bindings") {
-    if (section === "ir") {
-      irSize = irSize === 75 ? 50 : 75;
-    } else {
-      irSize = irSize === 25 ? 50 : 25;
-    }
+  const jsonSchemaBackend = new JsonSchemaBackend();
+
+  function getSchemaJson(parseResult: ParseResult): string {
+    const solveResult = solve(parseResult.expr);
+    const ctx = createContext(parseResult.expr, solveResult, {
+      app: parseResult.meta,
+    });
+    const emitResult = jsonSchemaBackend.emit(ctx);
+    return emitResult.files.get("schema.json") ?? "{}";
   }
 </script>
 
@@ -33,35 +42,39 @@
       <Messages type="warnings" messages={warnings} />
     {/if}
 
-    <div class="sections" style="--ir-size: {irSize}%">
-      <section class="ast">
-        <div class="header">
-          <h2>IR</h2>
-          <button
-            class="focus-btn"
-            onclick={() => setFocus("ir")}
-            title={irSize === 75 ? "Reset" : "Expand IR"}
-          >
-            {irSize === 75 ? "↕" : "↑"}
-          </button>
-        </div>
-        <CodeBlock code={format(expr)} lang="ir" />
-      </section>
-
-      <section class="ast">
-        <div class="header">
-          <h2>Bindings</h2>
-          <button
-            class="focus-btn"
-            onclick={() => setFocus("bindings")}
-            title={irSize === 25 ? "Reset" : "Expand Bindings"}
-          >
-            {irSize === 25 ? "↕" : "↑"}
-          </button>
-        </div>
-        <CodeBlock code={formatSolveResult(solve(expr), expr)} lang="bindings" />
-      </section>
+    <div class="tab-bar">
+      <button
+        class="tab"
+        class:active={activeTab === "ir"}
+        onclick={() => (activeTab = "ir")}
+      >
+        IR
+      </button>
+      <button
+        class="tab"
+        class:active={activeTab === "bindings"}
+        onclick={() => (activeTab = "bindings")}
+      >
+        Bindings
+      </button>
+      <button
+        class="tab"
+        class:active={activeTab === "schema"}
+        onclick={() => (activeTab = "schema")}
+      >
+        JSON Schema
+      </button>
     </div>
+
+    <section class="panel">
+      {#if activeTab === "ir"}
+        <CodeBlock code={format(expr)} lang="ir" />
+      {:else if activeTab === "bindings"}
+        <CodeBlock code={formatSolveResult(solve(expr), expr)} lang="bindings" />
+      {:else}
+        <CodeBlock code={getSchemaJson(result.value)} lang="json" />
+      {/if}
+    </section>
   {:else}
     <Messages type="errors" messages={[{ message: result.error }]} />
   {/if}
@@ -72,70 +85,49 @@
   .output {
     display: flex;
     flex-direction: column;
-    gap: 1rem;
+    gap: 0;
     overflow-y: auto;
     min-height: 0;
   }
 
-  h2 {
-    margin: 0;
-    font-size: 0.875rem;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    color: #888;
-  }
-
-  .sections {
+  .tab-bar {
     display: flex;
-    flex-direction: column;
-    gap: 1rem;
-    flex: 1;
-    min-height: 0;
-  }
-
-  section {
-    border: 1px solid #333;
-    border-radius: 4px;
-    background: #0d0d0d;
-    display: flex;
-    flex-direction: column;
-    min-height: 0;
-  }
-
-  .sections > section:first-child {
-    height: var(--ir-size);
-    transition: height 0.3s ease;
-  }
-
-  .sections > section:last-child {
-    height: calc(100% - var(--ir-size) - 1rem);
-    transition: height 0.3s ease;
-  }
-
-  .header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 0.5rem 1rem;
+    gap: 0;
     border-bottom: 1px solid #333;
-    background: #151515;
-    border-radius: 4px 4px 0 0;
     flex-shrink: 0;
   }
 
-  .focus-btn {
+  .tab {
     background: transparent;
-    border: 1px solid #444;
-    border-radius: 3px;
+    border: none;
+    border-bottom: 2px solid transparent;
     color: #888;
     cursor: pointer;
-    padding: 0.25rem 0.5rem;
-    font-size: 12px;
+    padding: 0.5rem 1rem;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
     transition: all 0.15s;
   }
 
-  .focus-btn:hover {
-    border-color: #666;
+  .tab:hover {
     color: #ccc;
+  }
+
+  .tab.active {
+    color: #fff;
+    border-bottom-color: #58a6ff;
+  }
+
+  .panel {
+    flex: 1;
+    min-height: 0;
+    border: 1px solid #333;
+    border-top: none;
+    border-radius: 0 0 4px 4px;
+    background: #0d0d0d;
+    display: flex;
+    flex-direction: column;
+    overflow: auto;
   }
 </style>

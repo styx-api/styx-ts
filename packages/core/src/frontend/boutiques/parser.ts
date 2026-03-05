@@ -158,8 +158,12 @@ export class BoutiquesParser implements Frontend {
     const name = btInput.id;
     const title = btInput.name;
     const description = btInput.description;
+    const defaultValue = btInput["default-value"];
 
-    if (!isString(name) && !isString(title) && !isString(description)) {
+    const hasDefault =
+      isString(defaultValue) || isNumber(defaultValue) || typeof defaultValue === "boolean";
+
+    if (!isString(name) && !isString(title) && !isString(description) && !hasDefault) {
       return undefined;
     }
 
@@ -171,6 +175,7 @@ export class BoutiquesParser implements Frontend {
           ...(isString(description) && { description }),
         },
       }),
+      ...(hasDefault && { defaultValue }),
     };
   }
 

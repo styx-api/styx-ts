@@ -17,11 +17,12 @@ export interface NodeMeta {
   name?: string;
   doc?: Documentation;
   outputs?: Output[];
+  defaultValue?: string | number | boolean;
 }
 
 /** Application-level metadata for the root node */
 export interface AppMeta {
-  id: string;
+  id?: string;
   version?: string;
   doc?: Documentation;
   authors?: string[];

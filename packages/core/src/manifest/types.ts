@@ -13,15 +13,3 @@ export interface PackageMeta {
   docker?: string;
   doc?: Documentation;
 }
-
-export interface StreamOutput {
-  name?: string;
-  doc?: Documentation;
-}
-
-export interface AppMeta {
-  uid?: string;
-  doc?: Documentation;
-  captureStdout?: StreamOutput;
-  captureStderr?: StreamOutput;
-}
