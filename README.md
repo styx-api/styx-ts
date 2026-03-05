@@ -1,6 +1,8 @@
-# Styx
+# Styx2
 
-Command line tool wrapper compiler/generator.
+Next-generation [Styx](https://github.com/childmindresearch/styx) compiler - parses CLI tool specifications (e.g. Boutiques descriptors), optimizes an intermediate representation, and generates type-safe wrappers for multiple target languages. Part of the [Styx/NiWrap ecosystem](https://niwrap.dev/).
+
+Early development. See [ARCHITECTURE.md](ARCHITECTURE.md) for design details.
 
 ## Development
 
@@ -23,9 +25,8 @@ npm run dev
 ## Project Structure
 
 ```
-styx/
-├── packages/
-│   └── core/          # Core compiler library + CLI
-├── playground/        # Svelte playground for testing
+styx2/
+├── packages/core/    # @styx/core - compiler library
+├── playground/       # Svelte interactive compiler explorer
 └── ...
 ```
