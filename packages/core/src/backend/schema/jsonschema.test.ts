@@ -220,6 +220,36 @@ describe("JsonSchema generation", () => {
     expect(props["input1"]?.type).toBe("array");
     expect(props["input1"]?.items).toEqual({ type: "string" });
   });
+  it("handles subcommand with flag wrapping", () => {
+    const schema = schemaFor(
+      minimalDescriptor({
+        "command-line": "test [MASKS]",
+        inputs: [
+          {
+            id: "masks",
+            name: "Masks",
+            "value-key": "[MASKS]",
+            "command-line-flag": "--masks",
+            type: {
+              id: "masks",
+              "command-line": "[FIXED] [MOVING]",
+              inputs: [
+                { id: "fixed", "value-key": "[FIXED]", type: "String", optional: true },
+                { id: "moving", "value-key": "[MOVING]", type: "String", optional: false },
+              ],
+            },
+            optional: true,
+          },
+        ],
+      }),
+    );
+    const props = schema.properties as Record<string, JsonSchema>;
+    const masks = props["masks"];
+    expect(masks).toBeDefined();
+    const masksProps = masks?.properties as Record<string, JsonSchema>;
+    expect(masksProps["fixed"]?.type).toBe("string");
+    expect(masksProps["moving"]?.type).toBe("string");
+  });
 });
 
 describe("JsonSchemaBackend", () => {

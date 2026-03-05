@@ -82,6 +82,25 @@ class SchemaBuilder {
     }
   }
 
+  /** Find the sequence node whose child bindings match the struct's field names. */
+  private findStructNode(
+    node: Expr,
+    type: Extract<BoundType, { kind: "struct" }>,
+  ): Extract<Expr, { kind: "sequence" }> | undefined {
+    if (node.kind !== "sequence") return undefined;
+    // Check if any child binding matches a field name
+    for (const child of node.attrs.nodes) {
+      const binding = this.ctx.resolve(child);
+      if (binding && binding.name in type.fields) return node;
+    }
+    // Recurse into child sequences (handles collapsed flag sequences)
+    for (const child of node.attrs.nodes) {
+      const result = this.findStructNode(child, type);
+      if (result) return result;
+    }
+    return undefined;
+  }
+
   private findTerminal(node: Expr): Expr {
     switch (node.kind) {
       case "optional":
@@ -122,8 +141,9 @@ class SchemaBuilder {
     const properties: Record<string, JsonSchema> = {};
     const required: string[] = [];
 
-    if (node?.kind === "sequence") {
-      for (const child of node.attrs.nodes) {
+    const structNode = node ? this.findStructNode(node, type) : undefined;
+    if (structNode) {
+      for (const child of structNode.attrs.nodes) {
         const childBinding = this.ctx.resolve(child);
         if (childBinding && childBinding.name in type.fields) {
           properties[childBinding.name] = this.fromBinding(childBinding);
