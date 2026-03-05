@@ -113,7 +113,8 @@ class SchemaBuilder {
       int: { type: "integer" } as JsonSchema,
       float: { type: "number" } as JsonSchema,
       str: { type: "string" } as JsonSchema,
-      path: { type: "string", format: "path" } as JsonSchema,
+      // TODO: rename to "path" - keeping "file" for v1 compatibility
+      path: { type: "string", "x-styx-type": "file" } as JsonSchema,
     }[scalar];
 
     const terminal = node ? this.findTerminal(node) : undefined;

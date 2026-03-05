@@ -83,7 +83,7 @@ describe("JsonSchema generation", () => {
     expect(props["input1"]?.type).toBe("number");
   });
 
-  it("maps file input to string with format=path", () => {
+  it("maps file input to string with x-styx-type=file", () => {
     const schema = schemaFor(
       minimalDescriptor({
         "command-line": "test [INPUT1]",
@@ -92,7 +92,7 @@ describe("JsonSchema generation", () => {
     );
     const props = schema.properties as Record<string, JsonSchema>;
     expect(props["input1"]?.type).toBe("string");
-    expect(props["input1"]?.format).toBe("path");
+    expect(props["input1"]?.["x-styx-type"]).toBe("file");
   });
 
   it("maps flag input to boolean", () => {
@@ -277,7 +277,7 @@ describe("JsonSchemaBackend", () => {
     expect(props["@type"]).toEqual({ const: "unknown/bet" });
     expect(schema.required).toContain("@type");
     expect(props["infile"]?.type).toBe("string");
-    expect(props["infile"]?.format).toBe("path");
+    expect(props["infile"]?.["x-styx-type"]).toBe("file");
     expect(props["maskfile"]?.type).toBe("string");
     expect(props["fractional_intensity"]?.type).toBe("number");
     expect(props["fractional_intensity"]?.minimum).toBe(0);
