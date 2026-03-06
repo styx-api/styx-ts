@@ -1,32 +1,34 @@
 import type { BoundType } from "../../bindings/index.js";
-import type { TypeMap } from "../backend.js";
 
-export const typescriptTypeMap: TypeMap = {
-  map(type: BoundType): string {
-    switch (type.kind) {
-      case "scalar":
-        return { int: "number", float: "number", str: "string", path: "string" }[type.scalar];
-      case "bool":
-        return "boolean";
-      case "count":
-        return "number";
-      case "optional":
-        return `${this.map(type.inner)} | undefined`;
-      case "list":
-        return `${this.map(type.item)}[]`;
-      case "struct": {
-        const fields = Object.entries(type.fields)
-          .map(([k, v]) => `${k}: ${this.map(v)}`)
-          .join("; ");
-        return `{ ${fields} }`;
-      }
-      case "union":
-        return type.variants.map((v) => this.map(v.type)).join(" | ");
-      case "nullable":
-        return `${this.map(type.inner)} | null`;
+export function mapType(type: BoundType, resolve: (type: BoundType) => string | undefined): string {
+  switch (type.kind) {
+    case "scalar":
+      return { int: "number", float: "number", str: "string", path: "InputPathType" }[type.scalar];
+    case "bool":
+      return "boolean";
+    case "count":
+      return "number";
+    case "literal":
+      return typeof type.value === "string" ? JSON.stringify(type.value) : String(type.value);
+    case "optional":
+      return `${mapType(type.inner, resolve)} | null | undefined`;
+    case "list": {
+      const inner = mapType(type.item, resolve);
+      return inner.includes("|") ? `Array<${inner}>` : `${inner}[]`;
     }
-  },
-  imports(): string[] {
-    return [];
-  },
-};
+    case "struct": {
+      const name = resolve(type);
+      if (name) return name;
+      const fields = Object.entries(type.fields)
+        .filter(([, v]) => v.kind !== "literal")
+        .map(([k, v]) => `${k}: ${mapType(v, resolve)}`)
+        .join("; ");
+      return `{ ${fields} }`;
+    }
+    case "union": {
+      const name = resolve(type);
+      if (name) return name;
+      return type.variants.map((v) => mapType(v.type, resolve)).join(" | ");
+    }
+  }
+}

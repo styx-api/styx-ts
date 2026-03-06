@@ -12,7 +12,9 @@ export class Scope {
 
   /** Check if a symbol is already taken (in this scope or any parent). */
   has(symbol: string): boolean {
-    return this.reserved.has(symbol) || this.used.has(symbol) || (this.parent?.has(symbol) ?? false);
+    return (
+      this.reserved.has(symbol) || this.used.has(symbol) || (this.parent?.has(symbol) ?? false)
+    );
   }
 
   /** Add a symbol, appending suffixes to avoid collisions. Returns the safe name. */

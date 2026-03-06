@@ -18,8 +18,6 @@ export const pythonTypeMap: TypeMap = {
         return "dict[str, Any]";
       case "union":
         return type.variants.map((v) => this.map(v.type)).join(" | ");
-      case "nullable":
-        return `${this.map(type.inner)} | None`;
     }
   },
   imports(type: BoundType): string[] {
@@ -29,7 +27,6 @@ export const pythonTypeMap: TypeMap = {
       if (t.kind === "struct") imports.add("from typing import Any");
       if (t.kind === "optional") collect(t.inner);
       if (t.kind === "list") collect(t.item);
-      if (t.kind === "nullable") collect(t.inner);
       if (t.kind === "union") t.variants.forEach((v) => collect(v.type));
       if (t.kind === "struct") Object.values(t.fields).forEach(collect);
     };

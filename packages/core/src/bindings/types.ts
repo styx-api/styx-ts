@@ -8,8 +8,7 @@ export type BoundType =
   | { kind: "optional"; inner: BoundType }
   | { kind: "list"; item: BoundType }
   | { kind: "struct"; fields: Record<string, BoundType> }
-  | { kind: "union"; variants: BoundVariant[] }
-  | { kind: "nullable"; inner: BoundType };
+  | { kind: "union"; variants: BoundVariant[] };
 
 export interface BoundVariant {
   name?: string;

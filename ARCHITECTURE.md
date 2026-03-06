@@ -71,15 +71,16 @@ The IR is the skeleton of the command line; the bindings define the typed interf
 
 ## Styx 1 vs Styx 2
 
-| | Styx 1 (Python) | Styx 2 (TypeScript) |
-|---|---|---|
-| **IR** | Dataclass hierarchy (`Param[T]` with body types) | Algebraic expr tree with `kind` discriminant |
-| **Optimization** | Minimal (string merging) | Pass-based pipeline (flatten, simplify, canonicalize) |
-| **Type resolution** | Direct mapping in frontend; each backend re-derives types via language provider protocol | Solver produces a universal `BoundType` tree; backends just translate it |
-| **Backends** | Python mature, TS/R partial; each implements a complex `LanguageProvider` protocol | All stubs (architecture in place); should be simpler since solver does the heavy lifting |
-| **Output files** | First-class: path templates with param refs, suffix stripping, fallbacks | Not yet modeled to the same degree |
+|                     | Styx 1 (Python)                                                                          | Styx 2 (TypeScript)                                                                      |
+| ------------------- | ---------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| **IR**              | Dataclass hierarchy (`Param[T]` with body types)                                         | Algebraic expr tree with `kind` discriminant                                             |
+| **Optimization**    | Minimal (string merging)                                                                 | Pass-based pipeline (flatten, simplify, canonicalize)                                    |
+| **Type resolution** | Direct mapping in frontend; each backend re-derives types via language provider protocol | Solver produces a universal `BoundType` tree; backends just translate it                 |
+| **Backends**        | Python mature, TS/R partial; each implements a complex `LanguageProvider` protocol       | All stubs (architecture in place); should be simpler since solver does the heavy lifting |
+| **Output files**    | First-class: path templates with param refs, suffix stripping, fallbacks                 | Not yet modeled to the same degree                                                       |
 
 Key Styx 1 features to eventually match:
+
 - **Output path templates** - `"output-[X].nii.gz"` parsed into literal + `OutputParamReference` tokens with suffix stripping and fallbacks
 - **Conditional groups** - command-line args only emitted when at least one param in the group is set
 

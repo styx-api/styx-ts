@@ -61,24 +61,16 @@ class SchemaBuilder {
       case "literal":
         return { const: type.value };
       case "optional":
-        return this.fromType(
-          type.inner,
-          node?.kind === "optional" ? node.attrs.node : undefined,
-        );
+        return this.fromType(type.inner, node?.kind === "optional" ? node.attrs.node : undefined);
       case "list":
         return {
           type: "array",
-          items: this.fromType(
-            type.item,
-            node?.kind === "repeat" ? node.attrs.node : undefined,
-          ),
+          items: this.fromType(type.item, node?.kind === "repeat" ? node.attrs.node : undefined),
         };
       case "struct":
         return this.structSchema(type, node);
       case "union":
         return this.unionSchema(type);
-      case "nullable":
-        return { oneOf: [this.fromType(type.inner, node), { type: "null" }] };
     }
   }
 
@@ -134,10 +126,7 @@ class SchemaBuilder {
     return base;
   }
 
-  private structSchema(
-    type: Extract<BoundType, { kind: "struct" }>,
-    node?: Expr,
-  ): JsonSchema {
+  private structSchema(type: Extract<BoundType, { kind: "struct" }>, node?: Expr): JsonSchema {
     const properties: Record<string, JsonSchema> = {};
     const required: string[] = [];
 
@@ -149,12 +138,7 @@ class SchemaBuilder {
           properties[childBinding.name] = this.fromBinding(childBinding);
           const fieldType = type.fields[childBinding.name];
           const meta = childBinding.node.meta;
-          if (
-            fieldType &&
-            fieldType.kind !== "optional" &&
-            fieldType.kind !== "nullable" &&
-            meta?.defaultValue === undefined
-          ) {
+          if (fieldType && fieldType.kind !== "optional" && meta?.defaultValue === undefined) {
             required.push(childBinding.name);
           }
         }
@@ -162,7 +146,7 @@ class SchemaBuilder {
     } else {
       for (const [name, fieldType] of Object.entries(type.fields)) {
         properties[name] = this.fromType(fieldType);
-        if (fieldType.kind !== "optional" && fieldType.kind !== "nullable") {
+        if (fieldType.kind !== "optional") {
           required.push(name);
         }
       }

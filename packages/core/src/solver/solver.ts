@@ -187,13 +187,16 @@ export function solve(expr: Expr, options?: SolveOptions): SolveResult {
   const rootType = solveNode(expr, []);
 
   // Ensure a root binding always exists, even when the sequence collapsed
-  // (0 fields -> empty struct, 1 field -> single-field struct)
+  // (0 fields -> empty struct, 1 field that's not already a struct -> wrap in single-field struct)
   if (!nodeToBinding.has(expr) && expr.kind === "sequence") {
     const name = strategy.getName(expr, []);
     if (rootType === null) {
       createBinding(expr, name, { kind: "struct", fields: {} });
+    } else if (rootType.kind === "struct") {
+      // Already a struct (e.g. joined seq with 2+ fields) - use it directly
+      createBinding(expr, name, rootType);
     } else {
-      // Single field was collapsed - wrap it back into a struct
+      // Single scalar/optional/list field was collapsed - wrap it in a struct
       const childName = expr.attrs.nodes
         .map((child) => nodeToBinding.get(child))
         .find(Boolean)?.name;

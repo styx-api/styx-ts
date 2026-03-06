@@ -1,3 +1,4 @@
+export { alt, float, int, lit, opt, path, rep, repJoin, seq, seqJoin, str } from "./builders.js";
 export { format } from "./format.js";
 export type { AppMeta, NodeMeta, Output, OutputToken, StreamOutput } from "./meta.js";
 export type {

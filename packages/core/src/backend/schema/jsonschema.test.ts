@@ -42,9 +42,7 @@ describe("JsonSchema generation", () => {
   });
 
   it("includes app-level title and description", () => {
-    const schema = schemaFor(
-      minimalDescriptor({ name: "My Tool", description: "A useful tool" }),
-    );
+    const schema = schemaFor(minimalDescriptor({ name: "My Tool", description: "A useful tool" }));
     expect(schema.title).toBe("My Tool");
     expect(schema.description).toBe("A useful tool");
   });

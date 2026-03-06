@@ -5,6 +5,7 @@
     solve,
     formatSolveResult,
     JsonSchemaBackend,
+    TypeScriptBackend,
     createContext,
   } from "@styx/core";
   import type { ParseResult } from "@styx/core";
@@ -16,9 +17,10 @@
   }
 
   let { result }: Props = $props();
-  let activeTab = $state<"ir" | "bindings" | "schema">("ir");
+  let activeTab = $state<"ir" | "bindings" | "schema" | "typescript">("ir");
 
   const jsonSchemaBackend = new JsonSchemaBackend();
+  const typescriptBackend = new TypeScriptBackend();
 
   function getSchemaJson(parseResult: ParseResult): string {
     const solveResult = solve(parseResult.expr);
@@ -27,6 +29,15 @@
     });
     const emitResult = jsonSchemaBackend.emit(ctx);
     return emitResult.files.get("schema.json") ?? "{}";
+  }
+
+  function getTypeScript(parseResult: ParseResult): string {
+    const solveResult = solve(parseResult.expr);
+    const ctx = createContext(parseResult.expr, solveResult, {
+      app: parseResult.meta,
+    });
+    const emitResult = typescriptBackend.emit(ctx);
+    return [...emitResult.files.values()][0] ?? "";
   }
 </script>
 
@@ -43,11 +54,7 @@
     {/if}
 
     <div class="tab-bar">
-      <button
-        class="tab"
-        class:active={activeTab === "ir"}
-        onclick={() => (activeTab = "ir")}
-      >
+      <button class="tab" class:active={activeTab === "ir"} onclick={() => (activeTab = "ir")}>
         IR
       </button>
       <button
@@ -64,6 +71,13 @@
       >
         JSON Schema
       </button>
+      <button
+        class="tab"
+        class:active={activeTab === "typescript"}
+        onclick={() => (activeTab = "typescript")}
+      >
+        TypeScript
+      </button>
     </div>
 
     <section class="panel">
@@ -71,8 +85,10 @@
         <CodeBlock code={format(expr)} lang="ir" />
       {:else if activeTab === "bindings"}
         <CodeBlock code={formatSolveResult(solve(expr), expr)} lang="bindings" />
-      {:else}
+      {:else if activeTab === "schema"}
         <CodeBlock code={getSchemaJson(result.value)} lang="json" />
+      {:else}
+        <CodeBlock code={getTypeScript(result.value)} lang="typescript" />
       {/if}
     </section>
   {:else}
