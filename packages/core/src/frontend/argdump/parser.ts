@@ -770,7 +770,9 @@ export class ArgdumpParser implements Frontend {
           // name matches the binding the solver derives for the same node.
           // Otherwise findDeepName short-circuits on the inner's new name and
           // the variant struct's field key drifts from the binding name.
-          name: inner.meta?.name ?? findDeepName(inner) ?? dest,
+          // A flag arm unwraps to a bare literal with no name of its own, so
+          // fall back to the outer meta's flag-derived name before the dest.
+          name: inner.meta?.name ?? findDeepName(inner) ?? outerMeta?.name ?? dest,
         };
         altMembers.push(inner);
         excluded.add(dest);

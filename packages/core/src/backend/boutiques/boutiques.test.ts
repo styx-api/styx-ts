@@ -802,10 +802,14 @@ describe("argdump -> Boutiques validity", () => {
     expect(subInputs[0]?.type).toBe("File");
   });
 
-  it("uses meta.name for literal alternatives (e.g. mutex store_false dest)", () => {
+  it("uses meta.name for literal alternatives (e.g. mutex store_false flag)", () => {
     // Regression: solver always stripped the literal value (`--fs-no-reconall`
     // -> `fs-no-reconall`) and ignored alt.meta.name set by the mutex code,
     // which caused value-key collisions when the dest differed from the flag.
+    // The mutex code names each arm from `preferredName` (the long flag) so the
+    // seq, path and binding stay aligned; `dest` is only the last-resort
+    // fallback, and a flag arm unwraps to a bare literal that has no deep name
+    // of its own, so it takes the name from the optional it was unwrapped from.
     const bt = emitFromArgdump({
       prog: "petprep",
       actions: [
@@ -829,10 +833,16 @@ describe("argdump -> Boutiques validity", () => {
     const parent = inputs.find((i) => i.id === "fs_subjects_dir_or_run_reconall");
     expect(parent).toBeDefined();
     const variants = parent!.type as Record<string, unknown>[];
-    // The literal variant should use the dest from meta.name, not the
-    // stripped-flag fallback.
+    // Each variant is named after its flag, not its argparse dest.
     const variantIds = variants.map((v) => v.id).sort();
-    expect(variantIds).toEqual(["fs_subjects_dir", "run_reconall"]);
+    expect(variantIds).toEqual(["fs_no_reconall", "fs_subjects_dir"]);
+    // The alignment f86fba1 protects: every variant carries a non-empty
+    // sub-descriptor whose input id matches the variant it belongs to.
+    for (const v of variants) {
+      const subInputs = v.inputs as Record<string, unknown>[];
+      expect(subInputs).toHaveLength(1);
+      expect(subInputs[0]?.id).toBe(v.id);
+    }
   });
 
   it("sanitizes ids when source names contain illegal characters", () => {
