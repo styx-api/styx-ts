@@ -15,11 +15,11 @@ const streamApp = (stdout?: boolean, stderr?: boolean): AppMeta => ({
 });
 
 describe("Python boolean_optional pair", () => {
-  it("renders a true/false-tagged literal pair as one optional bool", () => {
-    const arm = (str: string, tag: string): Expr => ({
+  it("renders a true/false-named literal pair as one optional bool", () => {
+    const arm = (str: string, name: string): Expr => ({
       kind: "literal",
       attrs: { str },
-      meta: { variantTag: tag },
+      meta: { name },
     });
     const expr = seq(lit("mytool"), {
       kind: "optional",

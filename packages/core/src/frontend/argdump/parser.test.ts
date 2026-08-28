@@ -386,8 +386,8 @@ describe("ArgdumpParser", () => {
       );
       const alt = (actionNodes(result)[0] as Optional).attrs.node as Alternative;
       // Order is load-bearing: backends map the arms to true/false positionally.
-      expect(alt.attrs.alts[0]?.meta?.variantTag).toBe("true");
-      expect(alt.attrs.alts[1]?.meta?.variantTag).toBe("false");
+      expect(alt.attrs.alts[0]?.meta?.name).toBe("true");
+      expect(alt.attrs.alts[1]?.meta?.name).toBe("false");
     });
   });
 

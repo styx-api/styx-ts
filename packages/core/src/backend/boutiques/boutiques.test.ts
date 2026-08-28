@@ -701,9 +701,8 @@ describe("argdump -> Boutiques validity", () => {
   });
 
   it("keeps an all-integer choice set as Number", () => {
-    // bold2anat_dof: type=int, choices=[6,9,12], default=6. The parser builds a
-    // literal alternative and the solver canonicalizes clean ints back to
-    // numbers, so this stays a Number enum instead of collapsing to strings.
+    // bold2anat_dof: type=int, choices=[6,9,12], default=6. The solver
+    // canonicalizes clean ints, so the enum stays a Number.
     const bt = emitFromArgdump({
       prog: "mytool",
       actions: [
@@ -840,9 +839,7 @@ describe("argdump -> Boutiques validity", () => {
   it("groups both actions of a mutex group that share one dest", () => {
     // `dest` is not unique: `--submm-recon` (store_true) and `--no-submm-recon`
     // (store_false) both write `hires`, so argparse repeats it in the group as
-    // ["hires", "hires"]. Both actions belong to the group; keying nodes by a
-    // bare dest dropped one and left it outside as a separate, non-exclusive
-    // input.
+    // ["hires", "hires"]. Both actions belong to the group.
     const bt = emitFromArgdump({
       prog: "petprep",
       actions: [
@@ -874,14 +871,31 @@ describe("argdump -> Boutiques validity", () => {
     expect(inp["value-choices"]).toEqual(["--submm-recon", "--no-submm-recon"]);
   });
 
+  it("does not pull a same-dest non-member into a mutex group", () => {
+    // The group lists one dest per member, so `verbose` appearing once means one
+    // of its two actions is a member. `--quiet` shares the dest but was never
+    // listed, and `--verbose --quiet` stays legal.
+    const bt = emitFromArgdump({
+      prog: "tool",
+      actions: [
+        { option_strings: ["--verbose"], dest: "verbose", action_type: "store_true" },
+        { option_strings: ["--quiet"], dest: "verbose", action_type: "store_false" },
+        { option_strings: ["--debug"], dest: "debug", action_type: "store_true" },
+      ],
+      mutually_exclusive_groups: [{ actions: ["verbose", "debug"] }],
+    });
+    const inputs = bt.inputs as Record<string, unknown>[];
+    const quiet = inputs.find((i) => i["command-line-flag"] === "--quiet");
+    expect(quiet).toBeDefined();
+    expect(quiet!.type).toBe("Flag");
+    const group = inputs.find((i) => Array.isArray(i["value-choices"]));
+    expect(group!["value-choices"]).toEqual(["--verbose", "--debug"]);
+  });
+
   it("uses meta.name for literal alternatives (e.g. mutex store_false flag)", () => {
     // Regression: solver always stripped the literal value (`--fs-no-reconall`
     // -> `fs-no-reconall`) and ignored alt.meta.name set by the mutex code,
     // which caused value-key collisions when the dest differed from the flag.
-    // The mutex code names each arm from `preferredName` (the long flag) so the
-    // seq, path and binding stay aligned; `dest` is only the last-resort
-    // fallback, and a flag arm unwraps to a bare literal that has no deep name
-    // of its own, so it takes the name from the optional it was unwrapped from.
     const bt = emitFromArgdump({
       prog: "petprep",
       actions: [
@@ -909,8 +923,7 @@ describe("argdump -> Boutiques validity", () => {
     // Each variant is named after its flag, not its argparse dest.
     const variantIds = variants.map((v) => v.id).sort();
     expect(variantIds).toEqual(["fs_no_reconall", "fs_subjects_dir"]);
-    // The alignment f86fba1 protects: every variant carries a non-empty
-    // sub-descriptor whose input id matches the variant it belongs to.
+    // Every variant carries a non-empty sub-descriptor whose input id matches it.
     for (const v of variants) {
       const subInputs = v.inputs as Record<string, unknown>[];
       expect(subInputs).toHaveLength(1);

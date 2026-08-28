@@ -753,11 +753,9 @@ class BoutiquesEmitter {
         return this.mapScalar(type.scalar, node);
 
       case "bool": {
-        // A Boutiques `Flag` contributes a single token, so a bool whose IR
-        // arms are two distinct literals (`-hypo 1` / `-hypo 0`) cannot be
-        // expressed as one: the value would be dropped from the command line.
-        // Emit the two spellings as choices instead, which is what the source
-        // descriptor looked like and what re-parses back to a bool.
+        // A Boutiques `Flag` contributes a single token, so a bool whose IR arms
+        // are two distinct literals (`-hypo 1` / `-hypo 0`) would lose its value.
+        // Emit the two spellings as choices instead; they re-parse back to a bool.
         const choices = this.boolLiteralChoices(node);
         if (choices) return { type: "String", valueChoices: choices };
         return { type: "Flag" };
@@ -847,8 +845,7 @@ class BoutiquesEmitter {
     valueChoices?: (string | number)[];
   } {
     // All-literal union -> value-choices. `literalFromNode` canonicalizes clean
-    // integer literals to numbers, so an all-numeric enum stays a Number here
-    // rather than collapsing to stringified choices.
+    // integer literals to numbers, so an all-numeric enum stays a Number here.
     const allLiteral = type.variants.every((v: BoundVariant) => v.type.kind === "literal");
     if (allLiteral) {
       const values = type.variants.map((v: BoundVariant) =>
@@ -933,12 +930,8 @@ class BoutiquesEmitter {
     };
   }
 
-  // Find terminal node through wrappers
-  /**
-   * The two literal spellings of a bool, when the binding was collapsed from an
-   * alternative of two literals (`1`/`0`, `true`/`false`) rather than derived
-   * from a bare flag. A bare flag returns undefined and stays a `Flag`.
-   */
+  // The two literal spellings of a bool, when the binding was collapsed from an
+  // alternative of two literals (`1`/`0`, `true`/`false`) rather than a bare flag.
   private boolLiteralChoices(node: Expr): string[] | undefined {
     const terminal = this.findTerminal(node);
     if (terminal?.kind !== "alternative") return undefined;
@@ -950,6 +943,7 @@ class BoutiquesEmitter {
     return [first, second];
   }
 
+  // Find terminal node through wrappers
   private findTerminal(node: Expr): Expr | undefined {
     switch (node.kind) {
       case "optional":

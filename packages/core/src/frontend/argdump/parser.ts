@@ -545,15 +545,15 @@ export class ArgdumpParser implements Frontend {
 
     let innerNode: Expr;
     if (negFlag) {
-      // Tag the arms so the solver collapses them into one bool. argparse states
-      // outright that these are two spellings of a single boolean (one action,
-      // one dest), so this is declared rather than inferred from the spelling.
-      // Order is load-bearing: the first arm is the `true` case.
-      posLit.meta = { variantTag: "true" };
+      // Name the arms so the solver collapses them into one bool: argparse already
+      // declares these as two spellings of one boolean (one action, one dest).
+      // Order is load-bearing: the first arm is the `true` case. The names are
+      // also what argtype emits as arm labels, so the pair survives a round-trip.
+      posLit.meta = { name: "true" };
       const negLit: Literal = {
         kind: "literal",
         attrs: { str: negFlag },
-        meta: { variantTag: "false" },
+        meta: { name: "false" },
       };
       const alt: Alternative = { kind: "alternative", attrs: { alts: [posLit, negLit] } };
       innerNode = alt;
@@ -749,25 +749,27 @@ export class ArgdumpParser implements Frontend {
       const groupActions = group.actions;
       if (!isArray(groupActions)) continue;
 
-      // A group lists the dests of its members, and `dest` is not unique: two
+      // A group lists one dest per member action, and `dest` is not unique: two
       // actions can share one (`--submm-recon` / `--no-submm-recon` both writing
-      // `hires`), in which case argparse repeats it. The list means "the dests
-      // in this group", so dedupe it and take every action bound to each.
-      const members: Array<{ dest: string; node: Expr }> = [];
-      const seenDests = new Set<string>();
+      // `hires`), in which case the dest is repeated. So the occurrence count is
+      // how many of that dest's actions are members - taking every action bound
+      // to the dest would drag in a same-dest action the group never listed.
+      const wanted = new Map<string, number>();
       for (const dest of groupActions) {
-        if (!isString(dest) || seenDests.has(dest)) continue;
+        if (isString(dest)) wanted.set(dest, (wanted.get(dest) ?? 0) + 1);
+      }
+      const members: Array<{ dest: string; node: Expr }> = [];
+      for (const [dest, count] of wanted) {
         const nodesForDest = nodesByDest.get(dest);
         if (!nodesForDest) continue;
-        seenDests.add(dest);
-        for (const node of nodesForDest) members.push({ dest, node });
+        for (const node of nodesForDest.slice(0, count)) members.push({ dest, node });
       }
 
       if (members.length < 2) continue;
 
       // Build alt from member nodes. Unwrapping the optional drops its meta
-      // (doc/default), so merge it onto the inner node and name the inner
-      // so backends can derive a per-variant name.
+      // (doc/default), so merge it onto the inner node and give the inner a name
+      // backends can derive a per-variant id from.
       const altMembers: Expr[] = [];
       const memberNames: string[] = [];
       for (const { dest, node } of members) {
@@ -779,19 +781,16 @@ export class ArgdumpParser implements Frontend {
         } else {
           inner = node;
         }
-        inner.meta = {
-          ...outerMeta,
-          ...inner.meta,
-          // Prefer the deepest existing name in the subtree so the synthesized
-          // name matches the binding the solver derives for the same node.
-          // Otherwise findDeepName short-circuits on the inner's new name and
-          // the variant struct's field key drifts from the binding name.
-          // A flag arm unwraps to a bare literal with no name of its own, so
-          // fall back to the outer meta's flag-derived name before the dest.
-          name: inner.meta?.name ?? findDeepName(inner) ?? outerMeta?.name ?? dest,
-        };
+        // Prefer the deepest existing name in the subtree so the synthesized name
+        // matches the binding the solver derives for the same node. Otherwise
+        // findDeepName short-circuits on the inner's new name and the variant
+        // struct's field key drifts from the binding name. A flag arm unwraps to
+        // a bare literal with no name of its own, so fall back to the outer
+        // meta's flag-derived name before the dest.
+        const memberName = inner.meta?.name ?? findDeepName(inner) ?? outerMeta?.name ?? dest;
+        inner.meta = { ...outerMeta, ...inner.meta, name: memberName };
         altMembers.push(inner);
-        memberNames.push(inner.meta.name ?? dest);
+        memberNames.push(memberName);
         excluded.add(node);
       }
 
