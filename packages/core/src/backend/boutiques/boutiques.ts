@@ -752,8 +752,16 @@ class BoutiquesEmitter {
       case "scalar":
         return this.mapScalar(type.scalar, node);
 
-      case "bool":
+      case "bool": {
+        // A Boutiques `Flag` contributes a single token, so a bool whose IR
+        // arms are two distinct literals (`-hypo 1` / `-hypo 0`) cannot be
+        // expressed as one: the value would be dropped from the command line.
+        // Emit the two spellings as choices instead, which is what the source
+        // descriptor looked like and what re-parses back to a bool.
+        const choices = this.boolLiteralChoices(node);
+        if (choices) return { type: "String", valueChoices: choices };
         return { type: "Flag" };
+      }
 
       case "count":
         return this.mapCount(node);
@@ -926,6 +934,22 @@ class BoutiquesEmitter {
   }
 
   // Find terminal node through wrappers
+  /**
+   * The two literal spellings of a bool, when the binding was collapsed from an
+   * alternative of two literals (`1`/`0`, `true`/`false`) rather than derived
+   * from a bare flag. A bare flag returns undefined and stays a `Flag`.
+   */
+  private boolLiteralChoices(node: Expr): string[] | undefined {
+    const terminal = this.findTerminal(node);
+    if (terminal?.kind !== "alternative") return undefined;
+    const alts = terminal.attrs.alts;
+    if (alts.length !== 2 || !alts.every((a) => a.kind === "literal")) return undefined;
+    const strs = alts.map((a) => (a.kind === "literal" ? a.attrs.str : ""));
+    const [first, second] = strs;
+    if (first === undefined || second === undefined || first === second) return undefined;
+    return [first, second];
+  }
+
   private findTerminal(node: Expr): Expr | undefined {
     switch (node.kind) {
       case "optional":

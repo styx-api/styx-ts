@@ -427,6 +427,41 @@ describe("Boutiques subcommands", () => {
 });
 
 describe("Boutiques round-trip", () => {
+  it("keeps both spellings of a two-literal bool (e.g. `-hypo 1` / `-hypo 0`)", () => {
+    // The solver collapses a `1`/`0` choice pair to a bool, but a Boutiques
+    // `Flag` contributes a single token, so emitting one would drop the value
+    // and turn `-hypo 1` into a bare `-hypo`. Seen on freesurfer's
+    // mri_edit_segmentation_with_surfaces.
+    const descriptor = minimalDescriptor({
+      "command-line": "test [HYPO]",
+      inputs: [
+        {
+          id: "hypo",
+          "value-key": "[HYPO]",
+          type: "String",
+          "command-line-flag": "-hypo",
+          "value-choices": ["1", "0"],
+          optional: true,
+        },
+      ],
+    });
+    const emitted = roundTrip(descriptor);
+    const inp = (emitted.inputs as Record<string, unknown>[])[0]!;
+    expect(inp.type).toBe("String");
+    expect(inp["value-choices"]).toEqual(["1", "0"]);
+    expect(inp["command-line-flag"]).toBe("-hypo");
+  });
+
+  it("still emits a bare flag as Flag", () => {
+    const emitted = emitFor(
+      minimalDescriptor({
+        "command-line": "test [V]",
+        inputs: [{ id: "v", "value-key": "[V]", type: "Flag", "command-line-flag": "-v" }],
+      }),
+    );
+    expect((emitted.inputs as Record<string, unknown>[])[0]!.type).toBe("Flag");
+  });
+
   it("round-trips a simple descriptor", () => {
     roundTrip(
       minimalDescriptor({
