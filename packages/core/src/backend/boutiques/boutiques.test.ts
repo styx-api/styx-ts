@@ -665,10 +665,10 @@ describe("argdump -> Boutiques validity", () => {
     expect(nested["default-value"]).toBeUndefined();
   });
 
-  it("coerces String defaults & choices to strings (numeric type with explicit choices)", () => {
-    // bold2anat_dof: type=int, choices=[6,9,12], default=6 - parser produces
-    // a String alternative, but choices/default round-trip as numbers without
-    // coercion.
+  it("keeps an all-integer choice set as Number", () => {
+    // bold2anat_dof: type=int, choices=[6,9,12], default=6. The parser builds a
+    // literal alternative and the solver canonicalizes clean ints back to
+    // numbers, so this stays a Number enum instead of collapsing to strings.
     const bt = emitFromArgdump({
       prog: "mytool",
       actions: [
@@ -685,8 +685,33 @@ describe("argdump -> Boutiques validity", () => {
     const inputs = bt.inputs as Record<string, unknown>[];
     const inp = inputs.find((i) => i.id === "bold2anat_dof");
     expect(inp).toBeDefined();
+    expect(inp!.type).toBe("Number");
+    expect(inp!.integer).toBe(true);
+    expect(inp!["value-choices"]).toEqual([6, 9, 12]);
+    expect(inp!["default-value"]).toBeUndefined();
+    expect(inp!.description).toContain("Default: 6");
+  });
+
+  it("coerces String defaults & choices to strings (mixed choice set)", () => {
+    // A choice set that is not uniformly numeric stays a String, so the default
+    // and every choice must be coerced to strings to keep the input schema-valid.
+    const bt = emitFromArgdump({
+      prog: "mytool",
+      actions: [
+        {
+          option_strings: ["--mode"],
+          dest: "mode",
+          action_type: "store",
+          default: 6,
+          choices: [6, "auto"],
+        },
+      ],
+    });
+    const inputs = bt.inputs as Record<string, unknown>[];
+    const inp = inputs.find((i) => i.id === "mode");
+    expect(inp).toBeDefined();
     expect(inp!.type).toBe("String");
-    expect(inp!["value-choices"]).toEqual(["6", "9", "12"]);
+    expect(inp!["value-choices"]).toEqual(["6", "auto"]);
     expect(inp!["default-value"]).toBeUndefined();
     expect(inp!.description).toContain('Default: "6"');
   });

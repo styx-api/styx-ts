@@ -835,17 +835,25 @@ class BoutiquesEmitter {
     node: Expr,
   ): {
     type: string | BtDescriptor | BtDescriptor[];
+    integer?: boolean;
     valueChoices?: (string | number)[];
   } {
-    // All-literal union -> value-choices
+    // All-literal union -> value-choices. `literalFromNode` canonicalizes clean
+    // integer literals to numbers, so an all-numeric enum stays a Number here
+    // rather than collapsing to stringified choices.
     const allLiteral = type.variants.every((v: BoundVariant) => v.type.kind === "literal");
     if (allLiteral) {
-      return {
-        type: "String",
-        valueChoices: type.variants.map((v: BoundVariant) =>
-          v.type.kind === "literal" ? v.type.value : "",
-        ),
-      };
+      const values = type.variants.map((v: BoundVariant) =>
+        v.type.kind === "literal" ? v.type.value : "",
+      );
+      if (values.length > 0 && values.every((v) => typeof v === "number")) {
+        return {
+          type: "Number",
+          valueChoices: values,
+          ...(values.every((v) => Number.isInteger(v)) && { integer: true }),
+        };
+      }
+      return { type: "String", valueChoices: values };
     }
 
     // Any other union (all-struct or mixed) -> one SubCommand descriptor per
