@@ -371,6 +371,24 @@ describe("ArgdumpParser", () => {
       expect(alt.attrs.alts[1]).toMatchObject({ kind: "literal", attrs: { str: "--no-color" } });
       expect(opt.meta?.defaultValue).toBe(false);
     });
+
+    it("tags the arms true/false so the solver collapses them to one bool", () => {
+      const result = parse(
+        minimalDescriptor({
+          actions: [
+            {
+              dest: "color",
+              action_type: "boolean_optional",
+              option_strings: ["--color", "--no-color"],
+            },
+          ],
+        }),
+      );
+      const alt = (actionNodes(result)[0] as Optional).attrs.node as Alternative;
+      // Order is load-bearing: backends map the arms to true/false positionally.
+      expect(alt.attrs.alts[0]?.meta?.name).toBe("true");
+      expect(alt.attrs.alts[1]?.meta?.name).toBe("false");
+    });
   });
 
   describe("count", () => {

@@ -427,6 +427,41 @@ describe("Boutiques subcommands", () => {
 });
 
 describe("Boutiques round-trip", () => {
+  it("keeps both spellings of a two-literal bool (e.g. `-hypo 1` / `-hypo 0`)", () => {
+    // The solver collapses a `1`/`0` choice pair to a bool, but a Boutiques
+    // `Flag` contributes a single token, so emitting one would drop the value
+    // and turn `-hypo 1` into a bare `-hypo`. Seen on freesurfer's
+    // mri_edit_segmentation_with_surfaces.
+    const descriptor = minimalDescriptor({
+      "command-line": "test [HYPO]",
+      inputs: [
+        {
+          id: "hypo",
+          "value-key": "[HYPO]",
+          type: "String",
+          "command-line-flag": "-hypo",
+          "value-choices": ["1", "0"],
+          optional: true,
+        },
+      ],
+    });
+    const emitted = roundTrip(descriptor);
+    const inp = (emitted.inputs as Record<string, unknown>[])[0]!;
+    expect(inp.type).toBe("String");
+    expect(inp["value-choices"]).toEqual(["1", "0"]);
+    expect(inp["command-line-flag"]).toBe("-hypo");
+  });
+
+  it("still emits a bare flag as Flag", () => {
+    const emitted = emitFor(
+      minimalDescriptor({
+        "command-line": "test [V]",
+        inputs: [{ id: "v", "value-key": "[V]", type: "Flag", "command-line-flag": "-v" }],
+      }),
+    );
+    expect((emitted.inputs as Record<string, unknown>[])[0]!.type).toBe("Flag");
+  });
+
   it("round-trips a simple descriptor", () => {
     roundTrip(
       minimalDescriptor({
@@ -665,10 +700,9 @@ describe("argdump -> Boutiques validity", () => {
     expect(nested["default-value"]).toBeUndefined();
   });
 
-  it("coerces String defaults & choices to strings (numeric type with explicit choices)", () => {
-    // bold2anat_dof: type=int, choices=[6,9,12], default=6 - parser produces
-    // a String alternative, but choices/default round-trip as numbers without
-    // coercion.
+  it("keeps an all-integer choice set as Number", () => {
+    // bold2anat_dof: type=int, choices=[6,9,12], default=6. The solver
+    // canonicalizes clean ints, so the enum stays a Number.
     const bt = emitFromArgdump({
       prog: "mytool",
       actions: [
@@ -685,8 +719,33 @@ describe("argdump -> Boutiques validity", () => {
     const inputs = bt.inputs as Record<string, unknown>[];
     const inp = inputs.find((i) => i.id === "bold2anat_dof");
     expect(inp).toBeDefined();
+    expect(inp!.type).toBe("Number");
+    expect(inp!.integer).toBe(true);
+    expect(inp!["value-choices"]).toEqual([6, 9, 12]);
+    expect(inp!["default-value"]).toBeUndefined();
+    expect(inp!.description).toContain("Default: 6");
+  });
+
+  it("coerces String defaults & choices to strings (mixed choice set)", () => {
+    // A choice set that is not uniformly numeric stays a String, so the default
+    // and every choice must be coerced to strings to keep the input schema-valid.
+    const bt = emitFromArgdump({
+      prog: "mytool",
+      actions: [
+        {
+          option_strings: ["--mode"],
+          dest: "mode",
+          action_type: "store",
+          default: 6,
+          choices: [6, "auto"],
+        },
+      ],
+    });
+    const inputs = bt.inputs as Record<string, unknown>[];
+    const inp = inputs.find((i) => i.id === "mode");
+    expect(inp).toBeDefined();
     expect(inp!.type).toBe("String");
-    expect(inp!["value-choices"]).toEqual(["6", "9", "12"]);
+    expect(inp!["value-choices"]).toEqual(["6", "auto"]);
     expect(inp!["default-value"]).toBeUndefined();
     expect(inp!.description).toContain('Default: "6"');
   });
@@ -777,7 +836,63 @@ describe("argdump -> Boutiques validity", () => {
     expect(subInputs[0]?.type).toBe("File");
   });
 
-  it("uses meta.name for literal alternatives (e.g. mutex store_false dest)", () => {
+  it("groups both actions of a mutex group that share one dest", () => {
+    // `dest` is not unique: `--submm-recon` (store_true) and `--no-submm-recon`
+    // (store_false) both write `hires`, so argparse repeats it in the group as
+    // ["hires", "hires"]. Both actions belong to the group.
+    const bt = emitFromArgdump({
+      prog: "petprep",
+      actions: [
+        {
+          option_strings: ["--submm-recon"],
+          dest: "hires",
+          action_type: "store_true",
+          nargs: 0,
+          const: true,
+          default: false,
+        },
+        {
+          option_strings: ["--no-submm-recon"],
+          dest: "hires",
+          action_type: "store_false",
+          nargs: 0,
+          const: false,
+          default: true,
+        },
+      ],
+      mutually_exclusive_groups: [{ actions: ["hires", "hires"] }],
+    });
+    const inputs = bt.inputs as Record<string, unknown>[];
+    // One exclusive input, not a group plus a stray flag alongside it.
+    expect(inputs).toHaveLength(1);
+    const inp = inputs[0]!;
+    expect(inp.id).toBe("submm_recon_or_no_submm_recon");
+    // Both spellings, each once - not the same action repeated.
+    expect(inp["value-choices"]).toEqual(["--submm-recon", "--no-submm-recon"]);
+  });
+
+  it("does not pull a same-dest non-member into a mutex group", () => {
+    // The group lists one dest per member, so `verbose` appearing once means one
+    // of its two actions is a member. `--quiet` shares the dest but was never
+    // listed, and `--verbose --quiet` stays legal.
+    const bt = emitFromArgdump({
+      prog: "tool",
+      actions: [
+        { option_strings: ["--verbose"], dest: "verbose", action_type: "store_true" },
+        { option_strings: ["--quiet"], dest: "verbose", action_type: "store_false" },
+        { option_strings: ["--debug"], dest: "debug", action_type: "store_true" },
+      ],
+      mutually_exclusive_groups: [{ actions: ["verbose", "debug"] }],
+    });
+    const inputs = bt.inputs as Record<string, unknown>[];
+    const quiet = inputs.find((i) => i["command-line-flag"] === "--quiet");
+    expect(quiet).toBeDefined();
+    expect(quiet!.type).toBe("Flag");
+    const group = inputs.find((i) => Array.isArray(i["value-choices"]));
+    expect(group!["value-choices"]).toEqual(["--verbose", "--debug"]);
+  });
+
+  it("uses meta.name for literal alternatives (e.g. mutex store_false flag)", () => {
     // Regression: solver always stripped the literal value (`--fs-no-reconall`
     // -> `fs-no-reconall`) and ignored alt.meta.name set by the mutex code,
     // which caused value-key collisions when the dest differed from the flag.
@@ -801,13 +916,19 @@ describe("argdump -> Boutiques validity", () => {
       ],
     });
     const inputs = bt.inputs as Record<string, unknown>[];
-    const parent = inputs.find((i) => i.id === "fs_subjects_dir_or_run_reconall");
+    // The group is named from its members, not their argparse dests.
+    const parent = inputs.find((i) => i.id === "fs_subjects_dir_or_fs_no_reconall");
     expect(parent).toBeDefined();
     const variants = parent!.type as Record<string, unknown>[];
-    // The literal variant should use the dest from meta.name, not the
-    // stripped-flag fallback.
+    // Each variant is named after its flag, not its argparse dest.
     const variantIds = variants.map((v) => v.id).sort();
-    expect(variantIds).toEqual(["fs_subjects_dir", "run_reconall"]);
+    expect(variantIds).toEqual(["fs_no_reconall", "fs_subjects_dir"]);
+    // Every variant carries a non-empty sub-descriptor whose input id matches it.
+    for (const v of variants) {
+      const subInputs = v.inputs as Record<string, unknown>[];
+      expect(subInputs).toHaveLength(1);
+      expect(subInputs[0]?.id).toBe(v.id);
+    }
   });
 
   it("sanitizes ids when source names contain illegal characters", () => {

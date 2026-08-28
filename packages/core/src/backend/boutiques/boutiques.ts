@@ -752,8 +752,14 @@ class BoutiquesEmitter {
       case "scalar":
         return this.mapScalar(type.scalar, node);
 
-      case "bool":
+      case "bool": {
+        // A Boutiques `Flag` contributes a single token, so a bool whose IR arms
+        // are two distinct literals (`-hypo 1` / `-hypo 0`) would lose its value.
+        // Emit the two spellings as choices instead; they re-parse back to a bool.
+        const choices = this.boolLiteralChoices(node);
+        if (choices) return { type: "String", valueChoices: choices };
         return { type: "Flag" };
+      }
 
       case "count":
         return this.mapCount(node);
@@ -835,17 +841,24 @@ class BoutiquesEmitter {
     node: Expr,
   ): {
     type: string | BtDescriptor | BtDescriptor[];
+    integer?: boolean;
     valueChoices?: (string | number)[];
   } {
-    // All-literal union -> value-choices
+    // All-literal union -> value-choices. `literalFromNode` canonicalizes clean
+    // integer literals to numbers, so an all-numeric enum stays a Number here.
     const allLiteral = type.variants.every((v: BoundVariant) => v.type.kind === "literal");
     if (allLiteral) {
-      return {
-        type: "String",
-        valueChoices: type.variants.map((v: BoundVariant) =>
-          v.type.kind === "literal" ? v.type.value : "",
-        ),
-      };
+      const values = type.variants.map((v: BoundVariant) =>
+        v.type.kind === "literal" ? v.type.value : "",
+      );
+      if (values.length > 0 && values.every((v) => typeof v === "number")) {
+        return {
+          type: "Number",
+          valueChoices: values,
+          ...(values.every((v) => Number.isInteger(v)) && { integer: true }),
+        };
+      }
+      return { type: "String", valueChoices: values };
     }
 
     // Any other union (all-struct or mixed) -> one SubCommand descriptor per
@@ -915,6 +928,19 @@ class BoutiquesEmitter {
       "command-line": `[${screamingSnakeCase(id)}]`,
       inputs: [input],
     };
+  }
+
+  // The two literal spellings of a bool, when the binding was collapsed from an
+  // alternative of two literals (`1`/`0`, `true`/`false`) rather than a bare flag.
+  private boolLiteralChoices(node: Expr): string[] | undefined {
+    const terminal = this.findTerminal(node);
+    if (terminal?.kind !== "alternative") return undefined;
+    const alts = terminal.attrs.alts;
+    if (alts.length !== 2 || !alts.every((a) => a.kind === "literal")) return undefined;
+    const strs = alts.map((a) => (a.kind === "literal" ? a.attrs.str : ""));
+    const [first, second] = strs;
+    if (first === undefined || second === undefined || first === second) return undefined;
+    return [first, second];
   }
 
   // Find terminal node through wrappers

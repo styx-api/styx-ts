@@ -50,10 +50,15 @@ export function defaultNamingStrategy(): NamingStrategy {
 }
 
 // Helper to check if alternative should collapse to bool
-function isBooleanLiteralPair(variants: Array<{ type: BoundType }>): boolean {
+function isBooleanLiteralPair(variants: Array<{ name?: string; type: BoundType }>): boolean {
   if (variants.length !== 2 || !variants.every((v) => v.type.kind === "literal")) {
     return false;
   }
+  // A frontend can name the arms `true`/`false` to declare the pair outright
+  // (argparse `boolean_optional`). The `true` arm must come first: backends map
+  // arms to true/false positionally, not by value, so a reordered pair must not
+  // collapse.
+  if (variants[0]?.name === "true" && variants[1]?.name === "false") return true;
   const [a, b] = variants.map((v) => (v.type.kind === "literal" ? v.type.value : null));
   // `literalFromNode` canonicalizes clean-int literals, so "0"/"1" arrive as the
   // numbers 0/1 (never strings); only "false"/"true" survive as strings.

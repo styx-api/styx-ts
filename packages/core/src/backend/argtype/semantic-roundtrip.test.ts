@@ -5,6 +5,7 @@ import { resolveOutputs, solve } from "../../solver/index.js";
 import { generatePython } from "../python/python.js";
 import { generateTypeScript } from "../typescript/typescript.js";
 import { BoutiquesParser } from "../../frontend/boutiques/parser.js";
+import { ArgdumpParser } from "../../frontend/argdump/parser.js";
 import { ArgtypeParser } from "../../frontend/argtype/parser-frontend.js";
 import type { ParseResult } from "../../frontend/frontend.js";
 import { generateArgtype } from "./emit.js";
@@ -94,6 +95,36 @@ function codegen(parsed: ParseResult) {
   });
   return { ts: generateTypeScript(ctx), py: generatePython(ctx) };
 }
+
+describe("argtype backend semantic round-trip (argdump -> argtype -> codegen)", () => {
+  it("keeps a boolean_optional pair collapsed to one bool", () => {
+    const parsed = new ArgdumpParser().parse(
+      JSON.stringify({
+        prog: "tool",
+        actions: [
+          {
+            dest: "verbose",
+            option_strings: ["--verbose", "--no-verbose"],
+            action_type: "boolean_optional",
+          },
+        ],
+      }),
+    );
+    const emitted = generateArgtype(parsed.expr, parsed.meta);
+    // The arm names are the only surface argtype has for the pair, so they must
+    // be emitted as labels or the collapse is lost on re-parse.
+    expect(emitted.source).toContain('alt(true: "--verbose", false: "--no-verbose")');
+    expect(emitted.warnings.filter((w) => w.message.includes("discriminator"))).toEqual([]);
+
+    const direct = codegen(parsed);
+    const viaArgtype = codegen(argtype.parse(emitted.source));
+    expect(direct.py).toContain('"verbose": typing.NotRequired[bool]');
+    expect(viaArgtype.py).toContain('"verbose": typing.NotRequired[bool]');
+    // Each branch keeps its own spelling on the command line.
+    expect(viaArgtype.py).toContain('cargs.append("--verbose")');
+    expect(viaArgtype.py).toContain('cargs.append("--no-verbose")');
+  });
+});
 
 describe("argtype backend semantic round-trip (Boutiques -> argtype -> codegen)", () => {
   it("produces identical TypeScript and Python via the argtype detour", () => {
