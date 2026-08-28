@@ -14,6 +14,34 @@ const streamApp = (stdout?: boolean, stderr?: boolean): AppMeta => ({
   ...(stderr && { stderr: { name: "stderr", doc: { description: "Standard error." } } }),
 });
 
+describe("Python boolean_optional pair", () => {
+  it("renders a true/false-tagged literal pair as one optional bool", () => {
+    const arm = (str: string, tag: string): Expr => ({
+      kind: "literal",
+      attrs: { str },
+      meta: { variantTag: tag },
+    });
+    const expr = seq(lit("mytool"), {
+      kind: "optional",
+      attrs: {
+        node: {
+          kind: "alternative",
+          attrs: { alts: [arm("--submm-recon", "true"), arm("--no-submm-recon", "false")] },
+          meta: { name: "submm_recon" },
+        },
+      },
+      meta: { name: "submm_recon" },
+    });
+    const code = generate(expr, { app: { id: "mytool" } });
+    // One bool parameter, not a union of two flag-string literals.
+    expect(code).toContain("submm_recon: bool | None = None");
+    expect(code).not.toContain('"--submm-recon" | ');
+    // Each branch emits its own spelling.
+    expect(code).toContain('cargs.append("--submm-recon")');
+    expect(code).toContain('cargs.append("--no-submm-recon")');
+  });
+});
+
 describe("Python stream outputs (stdout/stderr)", () => {
   it("declares list[str] fields on the Outputs NamedTuple", () => {
     const code = generate(seq(lit("mytool"), str("input")), { app: streamApp(true, true) });

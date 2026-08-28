@@ -545,7 +545,16 @@ export class ArgdumpParser implements Frontend {
 
     let innerNode: Expr;
     if (negFlag) {
-      const negLit: Literal = { kind: "literal", attrs: { str: negFlag } };
+      // Tag the arms so the solver collapses them into one bool. argparse states
+      // outright that these are two spellings of a single boolean (one action,
+      // one dest), so this is declared rather than inferred from the spelling.
+      // Order is load-bearing: the first arm is the `true` case.
+      posLit.meta = { variantTag: "true" };
+      const negLit: Literal = {
+        kind: "literal",
+        attrs: { str: negFlag },
+        meta: { variantTag: "false" },
+      };
       const alt: Alternative = { kind: "alternative", attrs: { alts: [posLit, negLit] } };
       innerNode = alt;
     } else {
