@@ -837,6 +837,43 @@ describe("argdump -> Boutiques validity", () => {
     expect(subInputs[0]?.type).toBe("File");
   });
 
+  it("groups both actions of a mutex group that share one dest", () => {
+    // `dest` is not unique: `--submm-recon` (store_true) and `--no-submm-recon`
+    // (store_false) both write `hires`, so argparse repeats it in the group as
+    // ["hires", "hires"]. Both actions belong to the group; keying nodes by a
+    // bare dest dropped one and left it outside as a separate, non-exclusive
+    // input.
+    const bt = emitFromArgdump({
+      prog: "petprep",
+      actions: [
+        {
+          option_strings: ["--submm-recon"],
+          dest: "hires",
+          action_type: "store_true",
+          nargs: 0,
+          const: true,
+          default: false,
+        },
+        {
+          option_strings: ["--no-submm-recon"],
+          dest: "hires",
+          action_type: "store_false",
+          nargs: 0,
+          const: false,
+          default: true,
+        },
+      ],
+      mutually_exclusive_groups: [{ actions: ["hires", "hires"] }],
+    });
+    const inputs = bt.inputs as Record<string, unknown>[];
+    // One exclusive input, not a group plus a stray flag alongside it.
+    expect(inputs).toHaveLength(1);
+    const inp = inputs[0]!;
+    expect(inp.id).toBe("submm_recon_or_no_submm_recon");
+    // Both spellings, each once - not the same action repeated.
+    expect(inp["value-choices"]).toEqual(["--submm-recon", "--no-submm-recon"]);
+  });
+
   it("uses meta.name for literal alternatives (e.g. mutex store_false flag)", () => {
     // Regression: solver always stripped the literal value (`--fs-no-reconall`
     // -> `fs-no-reconall`) and ignored alt.meta.name set by the mutex code,
@@ -865,7 +902,8 @@ describe("argdump -> Boutiques validity", () => {
       ],
     });
     const inputs = bt.inputs as Record<string, unknown>[];
-    const parent = inputs.find((i) => i.id === "fs_subjects_dir_or_run_reconall");
+    // The group is named from its members, not their argparse dests.
+    const parent = inputs.find((i) => i.id === "fs_subjects_dir_or_fs_no_reconall");
     expect(parent).toBeDefined();
     const variants = parent!.type as Record<string, unknown>[];
     // Each variant is named after its flag, not its argparse dest.

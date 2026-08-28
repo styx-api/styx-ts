@@ -740,30 +740,37 @@ export class ArgdumpParser implements Frontend {
   private applyMutualExclusion(
     groups: unknown[],
     nodes: Expr[],
-    nodesByDest: Map<string, Expr>,
+    nodesByDest: Map<string, Expr[]>,
   ): Expr[] {
-    const excluded = new Set<string>();
+    const excluded = new Set<Expr>();
 
     for (const group of groups) {
       if (!isObject(group)) continue;
       const groupActions = group.actions;
       if (!isArray(groupActions)) continue;
 
-      const memberDests: string[] = [];
+      // A group lists the dests of its members, and `dest` is not unique: two
+      // actions can share one (`--submm-recon` / `--no-submm-recon` both writing
+      // `hires`), in which case argparse repeats it. The list means "the dests
+      // in this group", so dedupe it and take every action bound to each.
+      const members: Array<{ dest: string; node: Expr }> = [];
+      const seenDests = new Set<string>();
       for (const dest of groupActions) {
-        if (isString(dest) && nodesByDest.has(dest)) {
-          memberDests.push(dest);
-        }
+        if (!isString(dest) || seenDests.has(dest)) continue;
+        const nodesForDest = nodesByDest.get(dest);
+        if (!nodesForDest) continue;
+        seenDests.add(dest);
+        for (const node of nodesForDest) members.push({ dest, node });
       }
 
-      if (memberDests.length < 2) continue;
+      if (members.length < 2) continue;
 
       // Build alt from member nodes. Unwrapping the optional drops its meta
-      // (doc/default), so merge it onto the inner node and tag the inner
-      // with the dest so backends can derive a per-variant name.
+      // (doc/default), so merge it onto the inner node and name the inner
+      // so backends can derive a per-variant name.
       const altMembers: Expr[] = [];
-      for (const dest of memberDests) {
-        const node = nodesByDest.get(dest)!;
+      const memberNames: string[] = [];
+      for (const { dest, node } of members) {
         let inner: Expr;
         let outerMeta: NodeMeta | undefined;
         if (node.kind === "optional") {
@@ -784,7 +791,8 @@ export class ArgdumpParser implements Frontend {
           name: inner.meta?.name ?? findDeepName(inner) ?? outerMeta?.name ?? dest,
         };
         altMembers.push(inner);
-        excluded.add(dest);
+        memberNames.push(inner.meta.name ?? dest);
+        excluded.add(node);
       }
 
       const alt: Alternative = { kind: "alternative", attrs: { alts: altMembers } };
@@ -799,19 +807,20 @@ export class ArgdumpParser implements Frontend {
 
       // Synthesize a name so backends can derive a meaningful id instead of
       // a Scope-generated placeholder. Prefer an explicit title if surfaced
-      // by argdump, otherwise concat dests for 2-member groups, fall back
-      // to a "_choice" suffix for larger groups.
+      // by argdump, otherwise concat the member names for 2-member groups, fall
+      // back to a "_choice" suffix for larger groups. Member names, not dests:
+      // members sharing a dest would otherwise collapse to one repeated word.
       const title = isString(group.title) ? group.title : undefined;
+      const idPart = (n: string): string => n.replace(/-/g, "_");
       const groupName =
         title ??
-        (memberDests.length === 2
-          ? `${memberDests[0]}_or_${memberDests[1]}`
-          : `${memberDests[0]}_choice`);
+        (memberNames.length === 2
+          ? `${idPart(memberNames[0]!)}_or_${idPart(memberNames[1]!)}`
+          : `${idPart(memberNames[0]!)}_choice`);
       groupNode.meta = { ...groupNode.meta, name: groupName };
 
       // Insert at position of first member
-      const firstDest = memberDests[0]!;
-      const firstIdx = nodes.findIndex((n) => n === nodesByDest.get(firstDest));
+      const firstIdx = nodes.findIndex((n) => n === members[0]!.node);
       if (firstIdx >= 0) {
         nodes.splice(firstIdx, 0, groupNode);
       } else {
@@ -820,13 +829,7 @@ export class ArgdumpParser implements Frontend {
     }
 
     // Remove excluded nodes
-    return nodes.filter((n) => {
-      // Find which dest this node corresponds to
-      for (const [dest, node] of nodesByDest) {
-        if (node === n && excluded.has(dest)) return false;
-      }
-      return true;
-    });
+    return nodes.filter((n) => !excluded.has(n));
   }
 
   // Main parser
@@ -839,7 +842,7 @@ export class ArgdumpParser implements Frontend {
 
     const positionals: Expr[] = [];
     const optionals: Expr[] = [];
-    const nodesByDest = new Map<string, Expr>();
+    const nodesByDest = new Map<string, Expr[]>();
 
     for (const rawAction of actions) {
       if (!isObject(rawAction)) continue;
@@ -849,7 +852,10 @@ export class ArgdumpParser implements Frontend {
 
       const dest = rawAction.dest;
       if (isString(dest)) {
-        nodesByDest.set(dest, node);
+        // Keyed to a list: `dest` is not unique across actions.
+        const forDest = nodesByDest.get(dest);
+        if (forDest) forDest.push(node);
+        else nodesByDest.set(dest, [node]);
       }
 
       if (this.isPositional(rawAction) && rawAction.action_type !== "parsers") {
